@@ -12,3 +12,7 @@ Explore, catch and collect fish, sell what you find, and purchase upgrades.
 4. Run the project with <kbd>F6</kbd>.
 
 Fishgem is an early work in progress.
+
+## Credit
+- Inspired by [WEBFISHING](https://store.steampowered.com/app/3146520/WEBFISHING)
+- assets from [onepixelmore](https://onepixelmore.itch.io/fishing)
