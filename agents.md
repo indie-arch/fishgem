@@ -93,6 +93,20 @@ Do not add multiplayer unless explicitly requested.
 Treat development as a collaboration rather than independently deciding every
 detail.
 
+### Notion Context Check
+
+Before planning, changing, or implementing any game system, use the Notion MCP
+to search my Notion workspace for information about that system. Search using
+the system name and relevant Fishgem terms, then fetch and read any relevant
+pages before continuing. Treat that material as project context alongside the
+repository and these instructions.
+
+If the search finds no relevant information, continue using the repository and
+these instructions. If the Notion MCP is unavailable, disconnected, or returns
+an authentication or access error, tell me before working on the system so I
+can restore access or decide how to proceed. Do not create or modify Notion
+content unless I explicitly ask you to.
+
 Ask me questions when:
 - a gameplay decision could reasonably go several ways
 - the visual or UX direction is subjective
