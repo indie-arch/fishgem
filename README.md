@@ -15,4 +15,4 @@ Fishgem is an early work in progress.
 
 ## Credit
 - Inspired by [WEBFISHING](https://store.steampowered.com/app/3146520/WEBFISHING)
-- assets from [onepixelmore](https://onepixelmore.itch.io/fishing)
+- assets from [kenny.nl](https://kenney.nl)
