@@ -4,8 +4,7 @@
 
 Fishgem is a small single-player 2D fishing/social game inspired by the steam game "WEBFISHING".
 
-The goal is a cozy, slightly silly game with fishing, exploration, collecting,
-customisation, and NPC interaction.
+The goal is a cozy, slightly silly game with fishing, exploration, collecting, and purchasing upgrades. The player should feel like they are in a small, charming world with a lot of personality.
 
 Keep the scope small. This is a small solo project, not an MMO and not a live-service game.
 
@@ -83,7 +82,7 @@ Prefer:
 Before adding a substantial new system, consider whether it actually helps the
 core loop:
 
-    explore -> fish -> collect -> sell/use -> customise -> explore
+    explore -> fish -> fishing minigame -> sell/use -> upgrade -> repeat
 
 Prefer finishing a small version of a feature before expanding it.
 
