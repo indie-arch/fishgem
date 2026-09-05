@@ -68,6 +68,19 @@ func run_checks() -> void:
 	game.fishing._process(30.0)
 	assert(game.mode == "result" and game.ui.modal_title.text == "The %s swam away." % escaped_name)
 	assert(game.progress.bag.is_empty(), "Escapes never add catches")
+	for species in game.progress.fish_catalog():
+		if species.id == "common":
+			continue
+		species.weight_kg = 1.0
+		game._on_caught(species)
+	assert(game.ui.modal_title.text == "Journal complete!", "Last new species celebrates completion")
+	assert(game.progress.journal_complete())
+	assert(loaded.load_game(TEST_SAVE) == OK and loaded.journal_complete(), "Completion persists")
+	game._on_caught(fish)
+	assert(game.ui.modal_title.text == "You caught a Pond pal!", "Repeat catches do not repeat milestone")
+	game._return_to_world()
+	game._open_journal()
+	assert(game.ui.modal_body.get_child(0).text.begins_with("JOURNAL COMPLETE!"))
 	game.free()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_SAVE))
 	print("PASS: world, cast/cancel, bite/catch, inventory, sale, upgrade, journal, pause, autosave/reload")

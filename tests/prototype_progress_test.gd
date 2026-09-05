@@ -45,11 +45,16 @@ func _initialize() -> void:
 	assert(restored.bag_value() == 30, "Migration preserves old bag proceeds")
 	assert(restored.save_game(TEST_SAVE) == OK)
 	assert(Progress.new().load_game(TEST_SAVE) == OK, "Migrated saves use version 2")
-	progress.coins = 1000
+	progress.coins = 3000
 	for kind in ["ease", "weight", "speed"]:
 		while progress.upgrades[kind] < Progress.MAX_UPGRADE_LEVEL:
 			assert(progress.buy_upgrade(kind))
 		assert(not progress.buy_upgrade(kind) and progress.upgrade_cost(kind) == 0)
+	assert(progress.save_game(TEST_SAVE) == OK)
+	assert(restored.load_game(TEST_SAVE) == OK and restored.upgrades == {"ease": 5, "weight": 5, "speed": 5})
+	assert(restored.journal_complete())
+	restored.discovered.common = 0
+	assert(not restored.journal_complete(), "Zero catches do not count as discovery")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_SAVE))
 	print("PASS: weighted sales, independent upgrades, weight averages, wait bounds, migration, saves and corrupt data rejection")
 	quit()
@@ -69,7 +74,7 @@ func _check_random_tuning() -> void:
 	for index in range(1000):
 		upgraded_mass += progress.roll_fish().weight_kg
 	assert(upgraded_mass > normal_mass * 1.59 and upgraded_mass < normal_mass * 1.61)
-	for level in range(4):
+	for level in range(Progress.MAX_UPGRADE_LEVEL + 1):
 		progress.upgrades.speed = level
 		var total_wait := 0.0
 		for index in range(1000):

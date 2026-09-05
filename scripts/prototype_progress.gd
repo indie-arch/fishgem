@@ -2,8 +2,8 @@ extends RefCounted
 ## Small, provisional economy. Species names, prices and rod tuning are placeholders.
 
 const SAVE_PATH := "user://fishgem_prototype.json"
-const MAX_UPGRADE_LEVEL := 3
-const UPGRADE_COSTS := [30, 65, 110]
+const MAX_UPGRADE_LEVEL := 5
+const UPGRADE_COSTS := [30, 65, 110, 170, 250]
 const TEXTURE_FOLDER := "res://assets/kenney_fish-pack_2/PNG/Default/"
 const FISH: Array[Dictionary] = [
 	{"id": "common", "name": "Pond pal", "radius": 38, "speed": 105, "required_hits": 7, "danger_speed": 0.035, "behavior": "steady", "color": "88cbe8", "texture_path": TEXTURE_FOLDER + "fish_blue.png", "price": 8, "base_weight": 1.0},
@@ -57,6 +57,13 @@ func sale_value(fish: Dictionary) -> int:
 	if not _valid_catch(fish):
 		return 0
 	return maxi(1, roundi(fish_by_id(fish.id).price * fish.weight_kg))
+
+
+func journal_complete() -> bool:
+	for fish in FISH:
+		if int(discovered.get(fish.id, 0)) <= 0:
+			return false
+	return true
 
 
 func bag_value() -> int:

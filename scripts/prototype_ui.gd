@@ -138,16 +138,19 @@ func show_shop(progress) -> void:
 	for kind in ["ease", "weight", "speed"]:
 		var level := int(progress.upgrades[kind])
 		var cost: int = progress.upgrade_cost(kind)
-		var suffix := "MAX" if level >= 3 else "%d coins" % cost
-		var upgrade := _button("%s  [%d/3]  •  %s" % [names[kind], level, suffix], modal_body, _request_upgrade.bind(kind))
-		upgrade.disabled = level >= 3 or progress.coins < cost
+		var suffix := "MAX" if level >= progress.MAX_UPGRADE_LEVEL else "%d coins" % cost
+		var upgrade := _button("%s  [%d/%d]  •  %s" % [names[kind], level, progress.MAX_UPGRADE_LEVEL, suffix], modal_body, _request_upgrade.bind(kind))
+		upgrade.disabled = level >= progress.MAX_UPGRADE_LEVEL or progress.coins < cost
 	_button("Back to the bank [Esc]", modal_body, func(): close_requested.emit()).grab_focus()
 
 func _request_upgrade(kind: String) -> void:
 	upgrade_requested.emit(kind)
 
 func show_journal(progress) -> void:
-	set_modal("Fish journal   •   %d / 6 discovered" % progress.discovered.size())
+	set_modal("Fish journal   •   %d / %d discovered" % [progress.discovered.size(), progress.FISH.size()])
+	if progress.journal_complete():
+		var celebration := _label("JOURNAL COMPLETE! Every fish found. Nice fishing!", modal_body)
+		celebration.add_theme_color_override("font_color", Color("397046"))
 	for fish in progress.fish_catalog():
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 14)

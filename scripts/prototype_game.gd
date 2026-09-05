@@ -92,9 +92,14 @@ func _on_bite() -> void:
 	fishing.start_fishing(progress.roll_fish(), int(progress.upgrades.ease))
 
 func _on_caught(fish: Dictionary) -> void:
+	var was_complete: bool = progress.journal_complete()
 	progress.add_catch(fish)
-	_show_result("You caught a %s!" % fish.name,
-		"It weighs %.2f kg!\nWorth %d coins at the shop." % [fish.weight_kg, progress.sale_value(fish)], fish.texture_path)
+	var title := "You caught a %s!" % fish.name
+	var details := "It weighs %.2f kg!\nWorth %d coins at the shop." % [fish.weight_kg, progress.sale_value(fish)]
+	if not was_complete and progress.journal_complete():
+		details = title + "\n" + details + "\n\nAll %d fish discovered. Nice fishing!" % progress.FISH.size()
+		title = "Journal complete!"
+	_show_result(title, details, fish.texture_path)
 	_save_progress()
 
 func _on_escaped() -> void:

@@ -28,13 +28,13 @@ The user confirmed a functional prototype, with eventual cutesy digital art. Use
 
 All fish can appear at any shoreline. Common fish have weight 4, fast fish weight 2, others weight 1. Species rates are 8–35 coins per kg. Sale value is rounded to the nearest coin, minimum one coin.
 
-Each upgrade track costs 30, 65 and 110 coins for its three levels:
+Each upgrade track costs 30, 65, 110, 170 and 250 coins for its five levels:
 
 - Steady grip (`ease`): +2 design pixels of target radius per level.
 - Heavy lure (`weight`): expected mass × (1 + 0.2 × level).
 - Quick bite (`speed`): wait × 0.8^level.
 
-Waits average two random 6–11 second rolls, averaging 8.5 seconds at level zero and 4.35 seconds at level three. Weight averages two random 0.6–1.4 size factors, multiplies by species base mass and the Heavy lure modifier, and rounds to 0.01 kg. The mass is rolled once per encounter and retained through catching, saving and selling. These are provisional test values.
+Waits average two random 6–11 second rolls, averaging 8.5 seconds at level zero and 2.79 seconds at level five. Weight averages two random 0.6–1.4 size factors, multiplies by species base mass and the Heavy lure modifier, and rounds to 0.01 kg. The mass is rolled once per encounter and retained through catching, saving and selling. These are provisional test values.
 
 Version 2 saves retain coins, all upgrade levels, each catch's species and mass, and discoveries. Version 1 saves migrate previous rod levels to Steady grip; old catches receive 1 kg, preserving old sale proceeds. World position and unfinished encounters are not saved.
 
@@ -47,3 +47,5 @@ The previous atlas repair retained all 2,754 painted cells byte-for-byte and rem
 ## Tools
 
 Godot MCP is not exposed to this session. Local Godot 4.7.2 supports running, testing and capturing the prototype, so it is not a blocker. Notion is connected; searches found no additional relevant collection, upgrade, exploration, selling, saving or NPC requirements.
+
+Completing the journal triggers a one-time catch celebration; the journal keeps a completion banner after reload. Resetting progress clears completion too.
