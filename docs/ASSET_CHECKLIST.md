@@ -8,11 +8,11 @@ Target direction: **cutesy digital art**. The user will find replacement assets.
 | --- | --- | --- |
 | Environment | Supplied Kenney RPG tiles; original painted map retained | Optional matching cutesy terrain and scenery |
 | Fish | Six supplied Kenney fish PNGs, assigned to prototype archetypes | Optional species art with a consistent visual style |
-| Player | Plain cream rectangle labelled YOU | Character idle, walk and fishing animations; character design still open |
-| Shop | Plain tan rectangle labelled SHOP | Stall/shop art; shopkeeper if desired |
-| Casting | Simple drawn rod/line, animated splash rings/droplets, bobber and wait timer | Optional final rod/bobber art and splash animation |
-| Fishing interface | Plain shapes, target ring and catch bar | UI artwork if desired; mechanics remain separate |
-| Journal / HUD | Engine font, plain panels and supplied fish icons | Readable font and inventory/currency/equipment icons |
+| Player | Plain cream rectangle labelled YOU, with walking bob/squash, cast lean and bite reaction | Character idle, walk and fishing animations; character design still open |
+| Shop | Plain tan rectangle with a proximity-reactive SHOP sign | Stall/shop art; shopkeeper if desired |
+| Casting | Simple drawn rod/line, animated splash rings/droplets, bobber, bite dip/ripples and warning | Optional final rod/bobber art and splash animation |
+| Fishing interface | Plain shapes, target ring, catch bar, localized hit/miss effects and first-time guidance | UI artwork if desired; mechanics remain separate |
+| Journal / HUD | Engine font, scrollable plain panels, supplied fish icons, personal records and location hints; result icon pop | Readable font and inventory/currency/equipment icons |
 | Audio | Silent | Cast, bite, hit, miss, catch, escape, sale and upgrade cues; ambience/music optional |
 
 ## Where replacements go

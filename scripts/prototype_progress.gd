@@ -13,11 +13,30 @@ const FISH: Array[Dictionary] = [
 	{"id": "large", "name": "Big softie", "radius": 53, "speed": 90, "required_hits": 12, "danger_speed": 0.045, "behavior": "steady", "color": "c8ac91", "texture_path": TEXTURE_FOLDER + "fish_brown.png", "price": 22, "base_weight": 4.0},
 	{"id": "rare", "name": "Pink prankster", "radius": 34, "speed": 160, "required_hits": 9, "danger_speed": 0.050, "behavior": "rare", "color": "edaed5", "texture_path": TEXTURE_FOLDER + "fish_pink.png", "price": 35, "base_weight": 1.5},
 ]
+const FISHING_SPOTS := {
+	"west_bank": {
+		"name": "West shallows",
+		"hint": "Shallow water favours Pond pals and Tiny rascals.",
+		"weights": [7, 1, 1, 4, 1, 1],
+	},
+	"home_bank": {
+		"name": "Home bank",
+		"hint": "A familiar mix, with plenty of Pond pals and Zoomy friends.",
+		"weights": [4, 2, 1, 1, 1, 1],
+	},
+	"east_bank": {
+		"name": "East reach",
+		"hint": "Deeper water favours Zoomy friends, Stubborn chums, Big softies and Pink pranksters.",
+		"weights": [1, 4, 3, 1, 4, 3],
+	},
+}
 
 var coins: int = 0
 var upgrades: Dictionary = {"ease": 0, "weight": 0, "speed": 0}
 var bag: Array[Dictionary] = []
 var discovered: Dictionary = {}
+var best_weights: Dictionary = {}
+var fishing_intro_seen: bool = false
 
 
 func fish_catalog() -> Array[Dictionary]:
@@ -31,18 +50,25 @@ func fish_by_id(species_id: String) -> Dictionary:
 	return {}
 
 
-func roll_fish() -> Dictionary:
-	# Common catches are more frequent; every archetype is available from the start.
-	var weighted_ids := ["common", "common", "common", "common", "fast", "fast", "strong", "tiny", "large", "rare"]
-	var fish := fish_by_id(weighted_ids.pick_random())
+func roll_fish(spot_id: String = "home_bank") -> Dictionary:
+	var weights: Array = FISHING_SPOTS.get(spot_id, FISHING_SPOTS.home_bank).weights
+	var total_weight := 0
+	for weight in weights:
+		total_weight += int(weight)
+	var ticket := randi_range(0, total_weight - 1)
+	var fish_index := 0
+	while ticket >= int(weights[fish_index]):
+		ticket -= int(weights[fish_index])
+		fish_index += 1
+	var fish: Dictionary = FISH[fish_index].duplicate(true)
 	# Averaging two rolls makes ordinary sizes more likely than the extremes.
 	var size_factor := (randf_range(0.6, 1.4) + randf_range(0.6, 1.4)) * 0.5
-	fish.weight_kg = snappedf(fish.base_weight * size_factor * (1.0 + 0.2 * upgrades.weight), 0.01)
+	fish.weight_kg = snappedf(fish.base_weight * size_factor * upgrade_effect("weight", int(upgrades.weight)), 0.01)
 	return fish
 
 
 func roll_wait_time() -> float:
-	return (randf_range(6.0, 11.0) + randf_range(6.0, 11.0)) * 0.5 * pow(0.8, upgrades.speed)
+	return (randf_range(6.0, 11.0) + randf_range(6.0, 11.0)) * 0.5 * (upgrade_effect("speed", int(upgrades.speed)) / 8.5)
 
 
 func add_catch(fish: Dictionary) -> void:
@@ -51,6 +77,7 @@ func add_catch(fish: Dictionary) -> void:
 	var species_id: String = fish.id
 	bag.append({"id": species_id, "weight_kg": float(fish.weight_kg)})
 	discovered[species_id] = int(discovered.get(species_id, 0)) + 1
+	best_weights[species_id] = maxf(float(best_weights.get(species_id, 0.0)), float(fish.weight_kg))
 
 
 func sale_value(fish: Dictionary) -> int:
@@ -80,6 +107,18 @@ func sell_all() -> int:
 	return earned
 
 
+static func upgrade_effect(kind: String, level: int) -> float:
+	level = maxi(level, 0)
+	match kind:
+		"ease":
+			return 2.0 * level
+		"weight":
+			return 1.0 + 0.2 * level
+		"speed":
+			return 8.5 * pow(0.8, level)
+	return 0.0
+
+
 func upgrade_cost(kind: String) -> int:
 	if not upgrades.has(kind) or upgrades[kind] >= MAX_UPGRADE_LEVEL:
 		return 0
@@ -100,7 +139,7 @@ func save_game(path: String = SAVE_PATH) -> Error:
 	var file := FileAccess.open(temporary_path, FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
-	file.store_string(JSON.stringify({"version": 2, "coins": coins, "upgrades": upgrades, "bag": bag, "discovered": discovered}))
+	file.store_string(JSON.stringify({"version": 3, "coins": coins, "upgrades": upgrades, "bag": bag, "discovered": discovered, "best_weights": best_weights, "fishing_intro_seen": fishing_intro_seen}))
 	file.flush()
 	var write_error := file.get_error()
 	file.close()
@@ -120,7 +159,7 @@ func load_game(path: String = SAVE_PATH) -> Error:
 	if parse_error != OK or not json.data is Dictionary:
 		return ERR_FILE_CORRUPT
 	var data: Dictionary = json.data
-	if not _valid_integer(data.get("version"), 1, 2) or not _valid_integer(data.get("coins"), 0, 1000000000):
+	if not _valid_integer(data.get("version"), 1, 3) or not _valid_integer(data.get("coins"), 0, 1000000000):
 		return ERR_FILE_CORRUPT
 	if not data.get("bag") is Array or not data.get("discovered") is Dictionary:
 		return ERR_FILE_CORRUPT
@@ -146,11 +185,29 @@ func load_game(path: String = SAVE_PATH) -> Error:
 	for species_id in data.discovered:
 		if not species_id is String or fish_by_id(species_id).is_empty() or not _valid_integer(data.discovered[species_id], 0, 1000000000):
 			return ERR_FILE_CORRUPT
+	var loaded_best_weights: Dictionary = {}
+	var loaded_intro_seen := false
+	if data.version == 3:
+		if not data.get("best_weights") is Dictionary or not data.get("fishing_intro_seen") is bool:
+			return ERR_FILE_CORRUPT
+		for species_id in data.best_weights:
+			var record := {"id": species_id, "weight_kg": data.best_weights[species_id]}
+			if not _valid_catch(record):
+				return ERR_FILE_CORRUPT
+			loaded_best_weights[species_id] = float(record.weight_kg)
+		loaded_intro_seen = data.fishing_intro_seen
+	elif data.version == 2:
+		# Only surviving measured catches are known; sold catches have no weight history.
+		for fish in loaded_bag:
+			loaded_best_weights[fish.id] = maxf(float(loaded_best_weights.get(fish.id, 0.0)), float(fish.weight_kg))
+	# V1's synthetic kilogram preserves prices, not a measured personal best.
 	# Validation is transactional: a damaged save never partly resets the session.
 	coins = int(data.coins)
 	upgrades = loaded_upgrades
 	bag = loaded_bag
 	discovered = data.discovered.duplicate()
+	best_weights = loaded_best_weights
+	fishing_intro_seen = loaded_intro_seen
 	return OK
 
 

@@ -6,9 +6,18 @@ const SPLASH_TIME := 0.8
 var origin := Vector2.ZERO
 var landing := Vector2.ZERO
 var elapsed := 0.0
+var biting := false
+var bite_elapsed := 0.0
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	if biting:
+		bite_elapsed += delta
+	queue_redraw()
+
+func show_bite() -> void:
+	biting = true
+	bite_elapsed = 0.0
 	queue_redraw()
 
 func _draw() -> void:
@@ -19,6 +28,8 @@ func _draw() -> void:
 	var bobber := rod_tip.lerp(landing, progress)
 	if elapsed < FLIGHT_TIME:
 		bobber.y -= sin(progress * PI) * 48.0
+	elif biting:
+		bobber.y += 5.0 + absf(sin(bite_elapsed * 14.0)) * 7.0
 	else:
 		bobber.y += sin((elapsed - FLIGHT_TIME) * 5.0) * 1.5
 	draw_line(rod_tip, bobber, Color("f6f1d3"), 1.5, true)
@@ -26,6 +37,17 @@ func _draw() -> void:
 		_draw_splash(elapsed - FLIGHT_TIME)
 	draw_circle(bobber, 4.0, Color("fff8e5"))
 	draw_circle(bobber + Vector2(0, -2), 2.5, Color("e77963"))
+	if biting:
+		_draw_bite()
+
+func _draw_bite() -> void:
+	# Repeating rings keep the entire warning readable, not just its first frame.
+	for index in 2:
+		var progress := fmod(bite_elapsed * 2.5 + float(index) * 0.5, 1.0)
+		draw_arc(landing, 9.0 + 28.0 * progress, 0, TAU, 32, Color(1, 0.96, 0.72, 1.0 - progress), 2.5, true)
+	var mark := landing + Vector2(0, -25)
+	draw_line(mark, mark + Vector2(0, -10), Color("fff8e5"), 4.0, true)
+	draw_circle(mark + Vector2(0, 6), 2.5, Color("fff8e5"))
 
 func _draw_splash(age: float) -> void:
 	if age >= SPLASH_TIME:

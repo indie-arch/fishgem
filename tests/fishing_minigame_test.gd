@@ -46,6 +46,7 @@ func run_checks() -> void:
 	assert(cancellations == 1 and not game.active, "Escape must cancel")
 	check_dash(game)
 	check_dash_frame_timing(game)
+	check_introduction(game)
 	game.free()
 	print("PASS: movement, catch, inactive input, miss penalty, escape, scaling, cancellation, continuous random dash, spam guard, reacquisition and dash frame timing")
 	quit()
@@ -113,3 +114,31 @@ func click(game: Control, design_position: Vector2) -> void:
 	event.pressed = true
 	event.position = game._design_origin() + design_position * game._design_scale()
 	game._gui_input(event)
+
+
+func check_introduction(game: Control) -> void:
+	var acknowledgements := [0]
+	game.introduction_completed.connect(func(): acknowledgements[0] += 1)
+	game.start_fishing({"danger_speed": 0.075}, 0, true)
+	game.set_process(false)
+	var start: Vector2 = game.target_position
+	var danger_before: float = game.danger_progress
+	game._process(30.0)
+	assert(game.active and game.target_position == start and game.danger_progress == danger_before, "Reading guidance cannot move the fish or consume the opening lead")
+	var key := InputEventKey.new()
+	key.keycode = KEY_ESCAPE
+	key.pressed = true
+	game._input(key)
+	assert(not game.active and acknowledgements[0] == 0, "Cancelling introduction does not acknowledge it")
+	game.dismiss_introduction()
+	assert(acknowledgements[0] == 0, "Inactive introduction cannot acknowledge")
+	game.start_fishing({"danger_speed": 0.075}, 0, true)
+	game.set_process(false)
+	key.keycode = KEY_ENTER
+	game._input(key)
+	assert(game.active and not game.introducing and game.hit_count == 0 and acknowledgements[0] == 1, "Starting guidance enables fishing without also scoring a hit")
+	game.dismiss_introduction()
+	game._input(key)
+	assert(acknowledgements[0] == 1, "Repeated acknowledgement is ignored")
+	game._process(0.1)
+	assert(game.danger_progress > danger_before, "Danger begins advancing only after acknowledgement")

@@ -4,6 +4,7 @@ extends CanvasLayer
 signal journal_requested
 signal pause_requested
 signal close_requested
+signal recast_requested
 signal sell_requested
 signal upgrade_requested(kind: String)
 signal quit_requested
@@ -17,9 +18,12 @@ var notice: Label
 var modal: PanelContainer
 var modal_title: Label
 var modal_body: VBoxContainer
+var modal_actions: VBoxContainer
+var modal_scroll: ScrollContainer
 var journal_button: Button
 var pause_button: Button
 var _screen: Control
+var _result_tween: Tween
 
 func _ready() -> void:
 	_screen = Control.new()
@@ -69,31 +73,45 @@ func _ready() -> void:
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_screen.add_child(center)
 	modal = PanelContainer.new()
-	modal.custom_minimum_size = Vector2(590, 0)
+	modal.custom_minimum_size = Vector2(740, 0)
 	center.add_child(modal)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 14)
 	modal.add_child(column)
 	modal_title = _label("", column)
 	modal_title.add_theme_font_size_override("font_size", 27)
+	modal_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	modal_scroll = ScrollContainer.new()
+	modal_scroll.custom_minimum_size.y = 330
+	modal_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	modal_scroll.follow_focus = true
+	column.add_child(modal_scroll)
 	modal_body = VBoxContainer.new()
 	modal_body.add_theme_constant_override("separation", 10)
-	column.add_child(modal_body)
+	modal_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	modal_scroll.add_child(modal_body)
+	modal_actions = VBoxContainer.new()
+	modal_actions.add_theme_constant_override("separation", 10)
+	column.add_child(modal_actions)
 	modal.hide()
 
 func update_stats(coins: int, bag_count: int) -> void:
 	stats.text = "FISHGEM   •   %d coins   •   %d fish" % [coins, bag_count]
 
 func set_modal(title: String) -> void:
+	_stop_result_animation()
 	modal_title.text = title
-	for child in modal_body.get_children():
-		modal_body.remove_child(child)
-		child.queue_free()
+	for container in [modal_body, modal_actions]:
+		for child in container.get_children():
+			container.remove_child(child)
+			child.queue_free()
+	modal_scroll.scroll_vertical = 0
 	modal.show()
 	journal_button.disabled = true
 	pause_button.disabled = true
 
 func hide_modal() -> void:
+	_stop_result_animation()
 	modal.hide()
 	journal_button.disabled = false
 	pause_button.disabled = false
@@ -106,21 +124,43 @@ func show_waiting() -> void:
 	hint.text = "Line cast! Watch the bobber…  [Esc] reel in"
 	notice.text = "Waiting for a bite. Some fish take their time."
 
-func show_result(title: String, details: String, texture_path: String) -> void:
+func show_result(title: String, details: String, texture_path: String, can_recast: bool = false) -> void:
 	set_modal(title)
 	if not texture_path.is_empty():
 		var icon := TextureRect.new()
 		icon.texture = load(texture_path)
-		icon.custom_minimum_size = Vector2(100, 76)
+		icon.custom_minimum_size = Vector2(100, 110)
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		modal_body.add_child(icon)
-	_label(details, modal_body)
-	_button("Keep fishing [Enter / Esc]", modal_body, func(): close_requested.emit()).grab_focus()
+		_animate_result_icon.call_deferred(icon)
+	_wrapped_label(details, modal_body)
+	var recast: Button
+	if can_recast:
+		recast = _button("Cast again [Enter]", modal_actions, func(): recast_requested.emit())
+	var back := _button("Back to bank [Esc]", modal_actions, func(): close_requested.emit())
+	if can_recast:
+		recast.grab_focus()
+	else:
+		back.grab_focus()
+
+func _animate_result_icon(icon: TextureRect) -> void:
+	if not is_instance_valid(icon) or not icon.is_inside_tree() or not modal.visible:
+		return
+	icon.pivot_offset = icon.size * 0.5
+	icon.scale = Vector2.ONE * 0.75
+	_result_tween = create_tween()
+	_result_tween.tween_property(icon, "scale", Vector2.ONE * 1.10, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_result_tween.tween_property(icon, "scale", Vector2.ONE, 0.20).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+func _stop_result_animation() -> void:
+	if _result_tween != null:
+		_result_tween.kill()
+		_result_tween = null
 
 func show_shop(progress) -> void:
 	set_modal("Bait & bits")
-	_label("Fish value = species rate × weight.\nEach rod upgrade improves just one thing.", modal_body)
+	_wrapped_label("Fish value = species rate × weight.\nEach rod upgrade improves just one thing.", modal_body)
 	if not progress.bag.is_empty():
 		var scroll := ScrollContainer.new()
 		scroll.custom_minimum_size.y = minf(110.0, progress.bag.size() * 27.0)
@@ -131,17 +171,36 @@ func show_shop(progress) -> void:
 		scroll.add_child(catches)
 		for caught_fish in progress.bag:
 			var fish: Dictionary = progress.fish_by_id(caught_fish.id)
-			_label("%s  •  %.2f kg  •  %d coins" % [fish.name, caught_fish.weight_kg, progress.sale_value(caught_fish)], catches)
+			_wrapped_label("%s  •  %.2f kg  •  %d coins" % [fish.name, caught_fish.weight_kg, progress.sale_value(caught_fish)], catches)
 	var sell := _button("Sell %d fish for %d coins" % [progress.bag.size(), progress.bag_value()], modal_body, func(): sell_requested.emit())
 	sell.disabled = progress.bag.is_empty()
-	var names := {"ease": "Steady grip — easier aiming", "weight": "Heavy lure — heavier catches", "speed": "Quick bite — shorter waits"}
+	var names := {"ease": "Steady grip", "weight": "Heavy lure", "speed": "Quick bite"}
+	var effects := {"ease": "Target radius bonus", "weight": "Catch weight multiplier", "speed": "Average bite wait"}
 	for kind in ["ease", "weight", "speed"]:
 		var level := int(progress.upgrades[kind])
 		var cost: int = progress.upgrade_cost(kind)
-		var suffix := "MAX" if level >= progress.MAX_UPGRADE_LEVEL else "%d coins" % cost
+		var maxed: bool = level >= progress.MAX_UPGRADE_LEVEL
+		var suffix := "MAX" if maxed else "%d coins" % cost
 		var upgrade := _button("%s  [%d/%d]  •  %s" % [names[kind], level, progress.MAX_UPGRADE_LEVEL, suffix], modal_body, _request_upgrade.bind(kind))
-		upgrade.disabled = level >= progress.MAX_UPGRADE_LEVEL or progress.coins < cost
-	_button("Back to the bank [Esc]", modal_body, func(): close_requested.emit()).grab_focus()
+		upgrade.disabled = maxed or progress.coins < cost
+		var current := _upgrade_value(kind, progress.upgrade_effect(kind, level))
+		var effect_text := "%s: %s (maximum benefit)" % [effects[kind], current]
+		if not maxed:
+			var next := _upgrade_value(kind, progress.upgrade_effect(kind, level + 1))
+			var affordability := "Ready to buy" if progress.coins >= cost else "Need %d more coins" % (cost - progress.coins)
+			effect_text = "%s: %s → %s\n%s" % [effects[kind], current, next, affordability]
+		_wrapped_label(effect_text, modal_body)
+	_button("Back to the bank [Esc]", modal_actions, func(): close_requested.emit()).grab_focus()
+
+func _upgrade_value(kind: String, value: float) -> String:
+	match kind:
+		"ease":
+			return "+%s px" % String.num(value, 1)
+		"weight":
+			return "×%s" % String.num(value, 1)
+		"speed":
+			return "%s s" % String.num(value, 5)
+	return ""
 
 func _request_upgrade(kind: String) -> void:
 	upgrade_requested.emit(kind)
@@ -149,9 +208,11 @@ func _request_upgrade(kind: String) -> void:
 func show_journal(progress) -> void:
 	set_modal("Fish journal   •   %d / %d discovered" % [progress.discovered.size(), progress.FISH.size()])
 	if progress.journal_complete():
-		var celebration := _label("JOURNAL COMPLETE! Every fish found. Nice fishing!", modal_body)
+		var celebration := _wrapped_label("JOURNAL COMPLETE! Every fish found. Nice fishing!", modal_body)
 		celebration.add_theme_color_override("font_color", Color("397046"))
-	for fish in progress.fish_catalog():
+	var catalog: Array = progress.fish_catalog()
+	for fish_index in catalog.size():
+		var fish: Dictionary = catalog[fish_index]
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 14)
 		modal_body.add_child(row)
@@ -163,27 +224,52 @@ func show_journal(progress) -> void:
 		if count > 0:
 			icon.texture = load(fish.texture_path)
 		row.add_child(icon)
-		_label("???   •   Keep fishing!" if count == 0 else "%s   •   caught %d   •   %d coins/kg" % [fish.name, count, fish.price], row)
-	_label("Discoveries stay in your journal after selling.", modal_body)
-	_button("Back [Esc]", modal_body, func(): close_requested.emit()).grab_focus()
+		var favourite := _preferred_spot(progress, fish_index)
+		var entry := "???   •   Undiscovered\nTry %s — this fish is more likely there." % favourite
+		if count > 0:
+			var record := "%.2f kg" % float(progress.best_weights[fish.id]) if progress.best_weights.has(fish.id) else "unknown — no saved weight for earlier catches"
+			entry = "%s   •   caught %d   •   %d coins/kg\nPersonal best: %s\nFavourite spot: %s" % [fish.name, count, fish.price, record, favourite]
+		_wrapped_label(entry, row)
+	_wrapped_label("Every species can bite at every bank. Favourite spots give better odds.\nDiscoveries and recorded personal bests stay after selling.", modal_body)
+	_button("Back [Esc]", modal_actions, func(): close_requested.emit()).grab_focus()
+
+func _preferred_spot(progress, fish_index: int) -> String:
+	var favourite := ""
+	var best_probability := -1.0
+	for spot_id in progress.FISHING_SPOTS:
+		var spot: Dictionary = progress.FISHING_SPOTS[spot_id]
+		var total := 0.0
+		for weight in spot.weights:
+			total += float(weight)
+		var probability := float(spot.weights[fish_index]) / total
+		if probability > best_probability:
+			best_probability = probability
+			favourite = str(spot.name)
+	return favourite
 
 func show_pause() -> void:
 	set_modal("A moment on the bank")
-	_label("WASD / arrows — walk\nE near water — cast\nE at the shop — sell / upgrade\nClick the moving target — reel in\nTab — journal    •    Esc — cancel / pause\n\nProgress saves after catches, sales and upgrades.", modal_body)
-	_button("Keep fishing [Esc]", modal_body, func(): close_requested.emit()).grab_focus()
-	_button("Reset save…", modal_body, func(): reset_requested.emit())
-	_button("Save & quit", modal_body, func(): quit_requested.emit())
+	_wrapped_label("WASD / arrows — walk\nE near water — cast\nE at the shop — sell / upgrade\nClick the moving target — reel in\nEnter / Space — start first-time guidance\nEnter on a result — cast again\nTab — journal    •    Esc — cancel / back\n\nProgress saves after catches, sales, upgrades\nand acknowledging fishing guidance.", modal_body)
+	_button("Keep fishing [Esc]", modal_actions, func(): close_requested.emit()).grab_focus()
+	_button("Reset save…", modal_actions, func(): reset_requested.emit())
+	_button("Save & quit", modal_actions, func(): quit_requested.emit())
 
 func show_reset_confirmation() -> void:
 	set_modal("Reset your save?")
-	_label("This clears your coins, all three rod upgrades,\ncaught fish and journal discoveries.\nYou will return to the starting bank.\n\nThis cannot be undone.", modal_body)
-	_button("Cancel — keep my save [Esc]", modal_body, func(): reset_cancelled.emit()).grab_focus()
-	_button("Yes, reset my save", modal_body, func(): reset_confirmed.emit())
+	_wrapped_label("This clears your coins, all three rod upgrades,\ncaught fish, journal discoveries and personal bests.\nFirst-time fishing guidance will appear again.\nYou will return to the starting bank.\n\nThis cannot be undone.", modal_body)
+	_button("Cancel — keep my save [Esc]", modal_actions, func(): reset_cancelled.emit()).grab_focus()
+	_button("Yes, reset my save", modal_actions, func(): reset_confirmed.emit())
 
 func _label(value: String, parent: Node) -> Label:
 	var label := Label.new()
 	label.text = value
 	parent.add_child(label)
+	return label
+
+func _wrapped_label(value: String, parent: Node) -> Label:
+	var label := _label(value, parent)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return label
 
 func _button(value: String, parent: Node, action: Callable) -> Button:

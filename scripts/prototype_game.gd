@@ -6,6 +6,7 @@ const World = preload("res://scenes/prototype_world.tscn")
 const Fishing = preload("res://scenes/fishing_minigame.tscn")
 const Interface = preload("res://scripts/prototype_ui.gd")
 
+const BITE_WARNING_TIME := 0.65
 var progress = Progress.new()
 var world
 var ui
@@ -14,6 +15,7 @@ var mode := "world"
 var bite_timer: Timer
 var save_path := "user://fishgem_prototype.json"
 var _shore_hint := "WASD / arrows: walk. Find the water and press E."
+var _fishing_spot := "home_bank"
 
 func _ready() -> void:
 	world = World.instantiate()
@@ -35,6 +37,7 @@ func _ready() -> void:
 	ui.journal_requested.connect(_open_journal)
 	ui.pause_requested.connect(_open_pause)
 	ui.close_requested.connect(_return_to_world)
+	ui.recast_requested.connect(_recast)
 	ui.sell_requested.connect(_sell)
 	ui.upgrade_requested.connect(_upgrade)
 	ui.quit_requested.connect(_quit_game)
@@ -44,6 +47,7 @@ func _ready() -> void:
 	fishing.caught.connect(_on_caught)
 	fishing.escaped.connect(_on_escaped)
 	fishing.cancelled.connect(func(): _end_encounter("Line reeled in. Nothing lost."))
+	fishing.introduction_completed.connect(_on_introduction_completed)
 	get_tree().auto_accept_quit = false
 	var result: Error = progress.load_game(save_path)
 	ui.notice.text = "Progress loaded. Welcome back!" if result == OK else "Walk to the shore and catch your first fish."
@@ -74,28 +78,57 @@ func _set_mode(next_mode: String) -> void:
 	ui.hint.text = _shore_hint if mode == "world" else "Esc: cancel / back"
 
 func _cast() -> void:
-	if mode != "world":
+	if mode != "world" or not world.is_near_water() or world.is_near_shop():
 		return
 	_set_mode("waiting")
 	world.begin_cast()
 	ui.show_waiting()
+	_fishing_spot = world.get_fishing_spot()
+	ui.notice.text = "%s — %s" % [Progress.FISHING_SPOTS[_fishing_spot].name, Progress.FISHING_SPOTS[_fishing_spot].hint]
 	bite_timer.start(progress.roll_wait_time())
 
 func _on_bite() -> void:
-	if mode != "waiting":
+	if mode == "waiting":
+		_set_mode("bite")
+		world.show_bite()
+		ui.hint.text = "Bite! Get ready to reel…  [Esc] cancel"
+		ui.notice.text = "A fish found your line!"
+		bite_timer.start(BITE_WARNING_TIME)
+		return
+	if mode != "bite":
 		return
 	world.end_cast()
 	ui.hide_modal()
 	_set_mode("fishing")
 	ui.journal_button.disabled = true
 	ui.pause_button.disabled = true
-	fishing.start_fishing(progress.roll_fish(), int(progress.upgrades.ease))
+	fishing.start_fishing(progress.roll_fish(_fishing_spot), int(progress.upgrades.ease), not progress.fishing_intro_seen)
+
+func _on_introduction_completed() -> void:
+	if mode != "fishing" or progress.fishing_intro_seen:
+		return
+	progress.fishing_intro_seen = true
+	_save_progress()
+
+func _recast() -> void:
+	if mode != "result":
+		return
+	_return_to_world()
+	_cast()
 
 func _on_caught(fish: Dictionary) -> void:
 	var was_complete: bool = progress.journal_complete()
+	var is_discovery := int(progress.discovered.get(fish.id, 0)) == 0
+	var previous_best := float(progress.best_weights.get(fish.id, 0.0))
 	progress.add_catch(fish)
 	var title := "You caught a %s!" % fish.name
 	var details := "It weighs %.2f kg!\nWorth %d coins at the shop." % [fish.weight_kg, progress.sale_value(fish)]
+	if is_discovery:
+		details += "\n\nNew species! Added to your fish journal."
+	elif float(fish.weight_kg) > previous_best:
+		details += "\n\nNew personal best!"
+		if previous_best > 0.0:
+			details += " Previous: %.2f kg." % previous_best
 	if not was_complete and progress.journal_complete():
 		details = title + "\n" + details + "\n\nAll %d fish discovered. Nice fishing!" % progress.FISH.size()
 		title = "Journal complete!"
@@ -111,7 +144,7 @@ func _show_result(title: String, details: String, texture_path: String) -> void:
 	bite_timer.stop()
 	world.end_cast()
 	_set_mode("result")
-	ui.show_result(title, details, texture_path)
+	ui.show_result(title, details, texture_path, world.is_near_water() and not world.is_near_shop())
 	ui.notice.text = title
 	_update_stats()
 
@@ -121,7 +154,7 @@ func _end_encounter(message: String) -> void:
 	_update_stats()
 
 func _return_to_world() -> void:
-	if mode == "waiting":
+	if mode == "waiting" or mode == "bite":
 		ui.notice.text = "Line reeled in. Cast again whenever you like."
 	bite_timer.stop()
 	world.end_cast()

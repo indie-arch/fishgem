@@ -27,6 +27,7 @@ func _initialize() -> void:
 	assert(progress.upgrade_cost("ease") == 65 and progress.upgrade_cost("weight") == 30)
 	assert(not progress.buy_upgrade("invalid") and progress.upgrade_cost("invalid") == 0)
 	_check_random_tuning()
+	_check_record_history()
 	progress.add_catch({"id": "common", "weight_kg": 1.27})
 	assert(progress.save_game(TEST_SAVE) == OK)
 	var restored = Progress.new()
@@ -44,7 +45,7 @@ func _initialize() -> void:
 	assert(restored.bag == [{"id":"common","weight_kg":1.0},{"id":"large","weight_kg":1.0}])
 	assert(restored.bag_value() == 30, "Migration preserves old bag proceeds")
 	assert(restored.save_game(TEST_SAVE) == OK)
-	assert(Progress.new().load_game(TEST_SAVE) == OK, "Migrated saves use version 2")
+	assert(Progress.new().load_game(TEST_SAVE) == OK, "Migrated saves remain readable")
 	progress.coins = 3000
 	for kind in ["ease", "weight", "speed"]:
 		while progress.upgrades[kind] < Progress.MAX_UPGRADE_LEVEL:
@@ -88,3 +89,36 @@ func _write_save(contents: String) -> void:
 	var file := FileAccess.open(TEST_SAVE, FileAccess.WRITE)
 	file.store_string(contents)
 	file.close()
+
+
+func _check_record_history() -> void:
+	var progress = Progress.new()
+	progress.add_catch({"id": "common", "weight_kg": 1.8})
+	progress.add_catch({"id": "common", "weight_kg": 1.2})
+	progress.add_catch({"id": "common", "weight_kg": 1.8})
+	assert(progress.best_weights.common == 1.8, "Smaller and equal catches never erase a record")
+	progress.sell_all()
+	progress.fishing_intro_seen = true
+	assert(progress.save_game(TEST_SAVE) == OK)
+	var restored = Progress.new()
+	assert(restored.load_game(TEST_SAVE) == OK)
+	assert(restored.best_weights.common == 1.8 and restored.bag.is_empty(), "Selling and reload preserve lifetime records")
+	assert(restored.fishing_intro_seen, "Acknowledged guidance persists")
+	_write_save('{"version":2,"coins":0,"upgrades":{"ease":0,"weight":0,"speed":0},"bag":[{"id":"common","weight_kg":1.2},{"id":"common","weight_kg":1.9}],"discovered":{"common":4,"tiny":2}}')
+	assert(restored.load_game(TEST_SAVE) == OK)
+	assert(restored.best_weights.common == 1.9 and not restored.best_weights.has("tiny"), "Only known historical weights become records")
+	assert(not restored.fishing_intro_seen, "Older saves can learn the new guidance")
+	_write_save('{"version":1,"coins":0,"rod_level":0,"bag":["common"],"discovered":{"common":1}}')
+	assert(restored.load_game(TEST_SAVE) == OK)
+	assert(restored.best_weights.is_empty(), "V1 sale-compatibility weights are not measured records")
+	assert(restored.save_game(TEST_SAVE) == OK)
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TEST_SAVE))
+	for invalid_records in [{"unknown": 1.0}, {"common": -1.0}, {"common": "heavy"}, {"common": 1001.0}]:
+		var damaged := data.duplicate(true)
+		damaged.best_weights = invalid_records
+		_write_save(JSON.stringify(damaged))
+		assert(restored.load_game(TEST_SAVE) == ERR_FILE_CORRUPT)
+		assert(restored.best_weights.is_empty() and restored.bag.size() == 1, "Invalid record load leaves the live session untouched")
+	data.fishing_intro_seen = "yes"
+	_write_save(JSON.stringify(data))
+	assert(restored.load_game(TEST_SAVE) == ERR_FILE_CORRUPT and not restored.fishing_intro_seen, "Guidance state must be a boolean")

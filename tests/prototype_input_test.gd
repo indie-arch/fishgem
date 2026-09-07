@@ -73,20 +73,36 @@ func run_checks() -> void:
 	_tap(KEY_E)
 	game.bite_timer.start(0.02)
 	await create_timer(0.06).timeout
-	_check(bite_count == 1 and game.mode == "fishing" and game.fishing.active, "Live timer starts encounter")
+	_check(bite_count == 1 and game.mode == "bite" and not game.fishing.active, "Live timer first warns of a bite")
+	await _check_movement_locked("bite")
+	_tap(KEY_ESCAPE)
+	await create_timer(game.BITE_WARNING_TIME + 0.08).timeout
+	_check(bite_count == 1 and game.mode == "world" and not game.fishing.active, "Cancelling a bite warning cannot start an encounter later")
+	_tap(KEY_E)
+	game.bite_timer.start(0.02)
+	await create_timer(game.BITE_WARNING_TIME + 0.12).timeout
+	_check(game.mode == "fishing" and game.fishing.introducing, "First fishing encounter starts with guidance")
 	_check(not game.ui.modal.visible and game.ui.journal_button.disabled, "Fishing replaces modal and disables HUD")
 	await _check_movement_locked("fishing")
+	_check(not game.progress.fishing_intro_seen, "Unacknowledged guidance is not saved")
 	_tap(KEY_ESCAPE)
 	_check(cancellation_count == 1 and game.mode == "world", "Fishing Escape returns to world exactly once without opening pause")
 	_check(not game.fishing.active and not game.ui.journal_button.disabled, "Cancellation restores HUD and hides fishing")
+	_check(not game.progress.fishing_intro_seen, "Cancelling guidance leaves it available next cast")
 
 	var catch_data: Dictionary = game.progress.fish_by_id("common")
 	catch_data.weight_kg = 1.42
 	game._on_caught(catch_data)
-	_check(game.mode == "result" and game.ui.modal_title.text.contains("Pond pal"), "Catch produces named result")
+	_check(game.mode == "result" and game.ui.modal.visible, "Catch produces result")
 	await _check_movement_locked("result")
 	_tap(KEY_ENTER)
-	_check(game.mode == "world" and not game.ui.modal.visible, "Enter dismisses the focused result button")
+	_check(game.mode == "waiting" and not game.ui.modal.visible, "Enter recasts from a result")
+	_check(game.bite_timer.wait_time >= 4.8 and game.bite_timer.wait_time <= 8.8, "Recast retains the full upgraded bite wait")
+	_tap(KEY_ESCAPE)
+	_check(game.mode == "world", "Recast remains cancellable")
+	game._on_caught(catch_data)
+	_tap(KEY_ESCAPE)
+	_check(game.mode == "world" and game.bite_timer.is_stopped(), "Escape returns to bank without recasting")
 
 	# Verify synthetic held-key input actually moves the player when unlocked.
 	game.world.player.position = game.world.ground.map_to_local(game.world.SPAWN_CELL)

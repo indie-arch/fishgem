@@ -4,15 +4,19 @@ extends Control
 signal caught(fish: Dictionary)
 signal escaped
 signal cancelled
+signal introduction_completed
 
+const Progress = preload("res://scripts/prototype_progress.gd")
 const DESIGN_SIZE := Vector2(760, 540)
 const POND := Rect2(38, 118, 684, 280)
+const INTRO_START := Rect2(218, 322, 324, 46)
 const INK := Color("263f3b")
 const PAPER := Color("f5e6bd")
 const CORAL := Color("d66a56")
 const DASH_DURATION := 0.18
 
 var active := false
+var introducing := false
 var current_fish: Dictionary = {}
 var target_position := Vector2.ZERO
 var target_radius := 32.0
@@ -31,6 +35,8 @@ var _direction := Vector2.RIGHT
 var _elapsed := 0.0
 var _flash := 0.0
 var _miss_flash := 0.0
+var _hit_position := Vector2.ZERO
+var _miss_position := Vector2.ZERO
 var _burst_time := 0.0
 var _turn_time := 0.9
 var _feedback := "Click the swimming fish!"
@@ -48,10 +54,10 @@ func _ready() -> void:
 		set_process_input(false)
 
 
-func start_fishing(fish: Dictionary, rod_level: int = 0) -> void:
+func start_fishing(fish: Dictionary, rod_level: int = 0, show_intro: bool = false) -> void:
 	current_fish = fish.duplicate(true)
 	# Keep upgrades modest: they help aim without changing species identity.
-	target_radius = clampf(float(fish.get("radius", 32.0)) + maxi(rod_level, 0) * 2.0, 14.0, 64.0)
+	target_radius = clampf(float(fish.get("radius", 32.0)) + Progress.upgrade_effect("ease", rod_level), 14.0, 64.0)
 	swim_speed = clampf(float(fish.get("speed", 125.0)), 20.0, 600.0)
 	required_hits = clampi(int(fish.get("required_hits", 8)), 3, 30)
 	danger_speed = clampf(float(fish.get("danger_speed", 0.045)), 0.005, 0.5)
@@ -76,17 +82,26 @@ func start_fishing(fish: Dictionary, rod_level: int = 0) -> void:
 	_dash_elapsed = 0.0
 	_feedback = "Click the swimming fish!"
 	active = true
+	introducing = show_intro
 	show()
 	set_process(true)
 	set_process_input(true)
 	queue_redraw()
 
 
-func _process(delta: float) -> void:
-	if not active:
+func dismiss_introduction() -> void:
+	if not active or not introducing:
 		return
-	_flash = maxf(0.0, _flash - delta * 4.0)
-	_miss_flash = maxf(0.0, _miss_flash - delta * 3.0)
+	introducing = false
+	introduction_completed.emit()
+	queue_redraw()
+
+
+func _process(delta: float) -> void:
+	if not active or introducing:
+		return
+	_flash = maxf(0.0, _flash - delta * 2.5)
+	_miss_flash = maxf(0.0, _miss_flash - delta * 2.5)
 	var swim_delta := _advance_dash(delta) if dashing else delta
 	if swim_delta > 0.000001:
 		_swim(swim_delta)
@@ -113,7 +128,7 @@ func _start_dash() -> void:
 	_direction = _dash_start.direction_to(_dash_destination)
 	_dash_elapsed = 0.0
 	dashing = true
-	_feedback = "Dashing — track it!"
+	_feedback = "Dashing — track it! Clicks are paused."
 
 
 func _advance_dash(delta: float) -> float:
@@ -169,6 +184,10 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		_stop()
 		cancelled.emit()
+	elif introducing and event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+			get_viewport().set_input_as_handled()
+			dismiss_introduction()
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -177,16 +196,22 @@ func _gui_input(event: InputEvent) -> void:
 	if event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
 		return
 	accept_event()
+	var point: Vector2 = (event.position - _design_origin()) / _design_scale()
+	if introducing:
+		if INTRO_START.has_point(point):
+			dismiss_introduction()
+		# The acknowledgement click must never also reach the fish.
+		return
 	# Immune only during the brief dash: repeated clicks cannot score or cause unfair misses.
 	if dashing:
 		return
-	var point: Vector2 = (event.position - _design_origin()) / _design_scale()
 	if not POND.has_point(point):
 		return
 	if point.distance_to(target_position) <= target_radius:
 		hit_count += 1
 		catch_progress = float(hit_count) / required_hits
 		_flash = 1.0
+		_hit_position = target_position
 		_feedback = "Nice! Keep reeling."
 		if hit_count >= required_hits:
 			_finish(true)
@@ -195,6 +220,7 @@ func _gui_input(event: InputEvent) -> void:
 	else:
 		danger_progress += 0.04
 		_miss_flash = 1.0
+		_miss_position = point
 		_feedback = "A little wide! Red is catching up."
 		if danger_progress >= catch_progress:
 			_finish(false)
@@ -211,6 +237,7 @@ func _finish(success: bool) -> void:
 
 func _stop() -> void:
 	active = false
+	introducing = false
 	dashing = false
 	hide()
 	set_process(false)
@@ -234,9 +261,9 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, DESIGN_SIZE), PAPER)
 	draw_rect(Rect2(Vector2.ZERO, DESIGN_SIZE), INK, false, 5.0)
 	_text(Vector2(32, 43), "FISH ON!", 28, INK)
-	_text(Vector2(32, 78), "Keep clicking the fish. Stay ahead of the red!", 19, INK)
+	_text(Vector2(32, 78), "Click inside the ring. Keep the gold marker ahead of red!", 19, INK)
 	_text(Vector2(626, 43), "ESC  leave", 16, INK)
-	draw_rect(POND, Color("70b8bb").lerp(CORAL, _miss_flash * 0.22))
+	draw_rect(POND, Color("70b8bb"))
 	draw_rect(POND, INK, false, 4.0)
 	for index in range(9):
 		var wave_y := POND.position.y + 24.0 + index * 29.0
@@ -249,15 +276,55 @@ func _draw() -> void:
 		draw_line(target_position - _direction * target_radius, target_position - _direction * target_radius * 2.0, Color(0.96, 0.90, 0.73, 0.6), 5.0)
 	else:
 		draw_arc(target_position, target_radius, 0.0, TAU, 48, PAPER, 3.0, true)
-	if _flash > 0.0:
-		draw_arc(target_position, target_radius + (1.0 - _flash) * 20.0, 0.0, TAU, 48, Color(1, 0.97, 0.78, _flash), 4.0, true)
+	_draw_click_feedback()
 	_draw_fish()
-	_text(Vector2(38, 430), _feedback, 19, INK)
+	_text(Vector2(38, 430), "Take your time — fishing is paused." if introducing else _feedback, 19, INK)
 	_draw_catch_bar()
-	_text(Vector2(38, 518), "RED = ESCAPE", 15, CORAL.darkened(0.2))
+	var danger_label := "RED IS CLOSE!" if catch_progress - danger_progress <= 0.06 else "RED = ESCAPE"
+	_text(Vector2(38, 518), danger_label, 15, CORAL.darkened(0.2))
 	_text(Vector2(318, 518), "%d / %d hits" % [hit_count, required_hits], 17, INK)
 	_text(Vector2(628, 518), "CAUGHT", 17, INK)
+	if introducing:
+		_draw_introduction()
 	draw_set_transform(Vector2.ZERO)
+
+
+func _draw_introduction() -> void:
+	var panel := Rect2(56, 136, 648, 248)
+	draw_rect(Rect2(panel.position + Vector2(4, 5), panel.size), INK)
+	draw_rect(panel, PAPER)
+	draw_rect(panel, INK, false, 4.0)
+	_text(Vector2(78, 174), "Your first fish — here's the trick!", 23, INK)
+	_text(Vector2(78, 211), "AIM: Click anywhere inside the fish's white ring.", 18, INK)
+	_text(Vector2(78, 242), "REEL: Each hit moves gold ahead. Red catching it = escape.", 18, INK)
+	_text(Vector2(78, 273), "DASH: After a hit, track it. Clicks pause until the ring returns.", 18, INK)
+	_text(Vector2(78, 304), "A miss moves red closer. Escape leaves without starting.", 17, INK)
+	draw_rect(Rect2(INTRO_START.position + Vector2(3, 4), INTRO_START.size), INK)
+	draw_rect(INTRO_START, Color("f4d478"))
+	draw_rect(INTRO_START, INK, false, 3.0)
+	_text(INTRO_START.position + Vector2(24, 30), "Start fishing  [Enter / Space]", 20, INK)
+
+
+func _draw_click_feedback() -> void:
+	if _flash > 0.0:
+		var ripple_radius := target_radius + (1.0 - _flash) * 26.0
+		var hit_color := Color(1.0, 0.97, 0.78, _flash)
+		draw_arc(_hit_position, ripple_radius, 0.0, TAU, 48, hit_color, 4.0, true)
+		for index in range(6):
+			var ray := Vector2.from_angle(index * TAU / 6.0)
+			draw_line(_hit_position + ray * (ripple_radius + 5.0), _hit_position + ray * (ripple_radius + 14.0), hit_color, 3.0, true)
+		var label_position := _hit_position + Vector2(-12, -target_radius - 8.0 - (1.0 - _flash) * 12.0)
+		label_position.y = maxf(POND.position.y + 24.0, label_position.y)
+		_text(label_position + Vector2(2, 2), "+1", 24, Color(INK, _flash))
+		_text(label_position, "+1", 24, hit_color)
+	if _miss_flash > 0.0:
+		var miss_color := Color(CORAL.darkened(0.2), _miss_flash)
+		var radius := 10.0 + (1.0 - _miss_flash) * 12.0
+		draw_arc(_miss_position, radius + 8.0, 0.0, TAU, 32, miss_color, 3.0, true)
+		draw_line(_miss_position + Vector2(-radius, -radius), _miss_position + Vector2(radius, radius), miss_color, 4.0, true)
+		draw_line(_miss_position + Vector2(-radius, radius), _miss_position + Vector2(radius, -radius), miss_color, 4.0, true)
+		var label_position := Vector2(clampf(_miss_position.x - 22.0, POND.position.x + 6.0, POND.end.x - 54.0), maxf(POND.position.y + 22.0, _miss_position.y - radius - 10.0))
+		_text(label_position, "MISS", 17, miss_color)
 
 
 func _draw_catch_bar() -> void:
@@ -268,6 +335,15 @@ func _draw_catch_bar() -> void:
 	var fish_ratio := (catch_progress + 0.14) / 1.14
 	draw_rect(Rect2(bar.position, Vector2(bar.size.x * danger_ratio, bar.size.y)), CORAL)
 	draw_rect(bar, INK, false, 3.0)
+	var danger_x := bar.position.x + bar.size.x * danger_ratio
+	draw_line(Vector2(danger_x, bar.position.y), Vector2(danger_x, bar.end.y), INK, 3.0)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(danger_x - 6.0, bar.end.y + 9.0),
+		Vector2(danger_x + 6.0, bar.end.y + 9.0),
+		Vector2(danger_x, bar.end.y + 1.0),
+	]), CORAL.darkened(0.2))
+	if catch_progress - danger_progress <= 0.06 or _miss_flash > 0.0:
+		draw_rect(bar.grow(3.0), CORAL.darkened(0.2), false, 3.0)
 	var marker := Vector2(bar.position.x + bar.size.x * fish_ratio, bar.get_center().y)
 	draw_circle(marker, 13, INK)
 	draw_circle(marker, 9, Color("f4d478"))

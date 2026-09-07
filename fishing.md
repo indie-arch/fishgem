@@ -11,6 +11,13 @@ The catch minigame is inspired by an aim-training style interaction rather than 
 - If the red zone reaches the fish before the player reels it in, the fish escapes / the line snaps.
 - Missing a click should have a small penalty so spam-clicking is worse than aiming carefully.
 
+### Bite and first-time guidance
+
+- A bobber dip and 0.65-second visual warning precede the aiming encounter.
+- The first encounter explains the ring, danger bar, miss penalty and dash lockout. Fish movement and danger are paused until the player presses Enter/Space or clicks Start fishing.
+- Acknowledgement is saved; Escape cancels without marking the guidance complete.
+- Catch and escape results offer Enter to cast again with the normal wait, or Escape to return to the bank.
+
 ### Fish movement
 
 The fish should **swim around continuously**, not simply teleport to a random point after every click. When hit, it can react by changing direction, speeding up, or dashing away. This keeps the mechanic feeling like fighting a fish rather than directly copying an aim trainer.

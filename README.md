@@ -9,8 +9,9 @@ A small single-player Godot 4 fishing prototype inspired by WEBFISHING. Walk aro
 1. Open `project.godot` in Godot 4.7.
 2. Press **F5** to run the prototype.
 3. Walk toward the water and press **E** when the casting prompt appears.
-4. When a fish bites, click the moving target to pull it ahead of the red danger zone.
-5. Return to the **SHOP** marker to sell fish and buy rod upgrades.
+4. Watch for the bobber dip and **Bite!** warning. On your first encounter, read the guidance and press **Enter / Space** or click **Start fishing**; danger stays paused until you start.
+5. Click the moving target to pull it ahead of the red danger zone. After a catch or escape, press **Enter** to cast again or **Escape** to return to the bank.
+6. Return to the **SHOP** marker to sell fish and buy rod upgrades.
 
 | Control | Action |
 | --- | --- |
@@ -18,13 +19,15 @@ A small single-player Godot 4 fishing prototype inspired by WEBFISHING. Walk aro
 | E | Cast at the shore / interact with shop |
 | Left click | Hit the fish target |
 | Tab | Fish journal |
+| Enter / Space | Start first-time fishing guidance |
+| Enter on result | Cast again at the current shore |
 | Escape | Cancel encounter / close panel / pause |
 
-Progress saves after catches, sales, and upgrades, and when quitting. Coins, individual fish weights, discoveries, and all three upgrade tracks persist; player position resets to the starting bank. Save file: `user://fishgem_prototype.json` (Godot **Project → Open User Data Folder**).
+Progress saves after catches, sales, upgrades and acknowledging the first-time guidance, and when quitting. Coins, individual fish weights, discoveries, per-species personal bests, guidance acknowledgement and all three upgrade tracks persist; player position resets to the starting bank. Save file: `user://fishgem_prototype.json` (Godot **Project → Open User Data Folder**).
 
-Old prototype saves migrate automatically: previous rod upgrades become Steady grip levels, and old bag entries receive 1 kg weights to preserve their sale values.
+Old prototype saves migrate automatically. Previous rod upgrades become Steady grip levels, and version 1 bag entries receive 1 kg weights to preserve their sale values, not to invent measured records. Version 2 bag weights establish starting personal bests; already-sold fish have no recoverable weight history and show an unknown record until caught again. Older saves also receive the new first-time guidance.
 
-To start over, open the Escape menu and choose **Reset save…**. Confirming clears coins, upgrades, caught fish and journal discoveries; Cancel or Escape keeps your save.
+To start over, open the Escape menu and choose **Reset save…**. Confirming clears coins, upgrades, caught fish, journal discoveries and personal bests, and restores first-time guidance; Cancel or Escape keeps your save.
 
 For an isolated fishing test with selectable species, open `scenes/fishing_demo.tscn` and press **F6**.
 
@@ -36,9 +39,21 @@ Six fish archetypes exercise the rules in `fishing.md`: common, fast, strong, ti
 - **Heavy lure:** raises average fish weight by 20% of the base weight per level.
 - **Quick bite:** reduces waiting time by 20% per level.
 
-Unupgraded bites take 6–11 seconds, with waits near the middle more common. Fish weight also favours the middle of a species-specific range. Sale value is the species rate multiplied by kilograms, rounded to whole coins. Catch and escape panels show the fish name; catches also show weight and value. Casts have a placeholder rod, splash and bobber.
 
-After a successful hit, the fish dashes to a random destination over 0.18 seconds. Track it and reacquire the target; clicks during that brief dash are ignored. Discovering every species triggers a journal-complete celebration and leaves a completion banner in the journal.
+The shop shows each upgrade's current → next numerical effect and any coin shortfall. Long shop and journal content scrolls, with navigation buttons kept visible.
+
+Three named shoreline areas give exploration a purpose:
+
+| Spot | Favoured catches |
+| --- | --- |
+| West shallows | Pond pals and Tiny rascals |
+| Home bank | The original balanced mix, weighted toward Pond pals and Zoomy friends |
+| East reach | Zoomy friends, Stubborn chums, Big softies and Pink pranksters |
+
+Every species remains available at every bank. The journal hints at the best spot for each species and retains personal-best weights after selling. New species and heavier records receive catch-result celebrations.
+Unupgraded bites take 6–11 seconds, with waits near the middle more common, followed by a 0.65-second visual bite warning before aiming starts. Fish weight also favours the middle of a species-specific range. Sale value is the species rate multiplied by kilograms, rounded to whole coins. Catch and escape panels show the fish name; catches also show weight and value. Casts have a placeholder rod, splash and bobber, with player casting/bite reactions. The player bobs while walking and the shop sign reacts to proximity.
+
+After a successful hit, the fish dashes to a random destination over 0.18 seconds. Track it and reacquire the target; clicks during that brief dash are ignored. Local hit bursts, miss markers and a close-danger warning clarify feedback without screen shake. Catch-result fish pop into view. Discovering every species triggers a journal-complete celebration and leaves a completion banner in the journal.
 
 Fish names, prices, encounter frequency and difficulty are provisional values for playtesting.
 
