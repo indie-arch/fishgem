@@ -4,9 +4,13 @@ Semi AI slop: a human-directed, AI-assisted fishing prototype.
 
 A small single-player Godot 4 fishing prototype inspired by WEBFISHING. Walk around the supplied map, catch fish through an aim-and-click minigame, sell them, and upgrade your rod.
 
+## Downloads and releases
+
+Desktop packages for Linux x64, Windows x64, and macOS Intel / Apple Silicon are built by GitHub Actions. Published downloads will appear on [GitHub Releases](https://github.com/indie-arch/fishgem/releases). See [playing a downloaded build](docs/PLAYING.md) and [building / publishing a release](docs/RELEASING.md).
+
 ## Play
 
-1. Open `project.godot` in Godot 4.7.
+1. Open `project.godot` in Godot 4.7.2.
 2. Press **F5** to run the prototype.
 3. Walk toward the water and press **E** when the casting prompt appears.
 4. Watch for the bobber dip and **Bite!** warning. On your first encounter, read the guidance and press **Enter / Space** or click **Start fishing**; danger stays paused until you start.
