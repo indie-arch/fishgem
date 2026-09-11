@@ -25,6 +25,8 @@ A small single-player Godot 4 fishing prototype inspired by WEBFISHING. Walk aro
 
 Progress saves after catches, sales, upgrades and acknowledging the first-time guidance, and when quitting. Coins, individual fish weights, discoveries, per-species personal bests, guidance acknowledgement and all three upgrade tracks persist; player position resets to the starting bank. Save file: `user://fishgem_prototype.json` (Godot **Project → Open User Data Folder**).
 
+If a save cannot be loaded, a recovery screen blocks gameplay and autosaving. Retry loading, quit without saving, or explicitly start fresh while preserving the original beside the save as `.unreadable` (numbered when needed). If preservation or the new save fails, recovery stays open.
+
 Old prototype saves migrate automatically. Previous rod upgrades become Steady grip levels, and version 1 bag entries receive 1 kg weights to preserve their sale values, not to invent measured records. Version 2 bag weights establish starting personal bests; already-sold fish have no recoverable weight history and show an unknown record until caught again. Older saves also receive the new first-time guidance.
 
 To start over, open the Escape menu and choose **Reset save…**. Confirming clears coins, upgrades, caught fish, journal discoveries and personal bests, and restores first-time guidance; Cancel or Escape keeps your save.
@@ -50,6 +52,8 @@ Three named shoreline areas give exploration a purpose:
 | Home bank | The original balanced mix, weighted toward Pond pals and Zoomy friends |
 | East reach | Zoomy friends, Stubborn chums, Big softies and Pink pranksters |
 
+The HUD tracks “Collect every fish” progress and points to journal hints, then celebrates completion. Selling fish never reduces this count.
+
 Every species remains available at every bank. The journal hints at the best spot for each species and retains personal-best weights after selling. New species and heavier records receive catch-result celebrations.
 Unupgraded bites take 6–11 seconds, with waits near the middle more common, followed by a 0.65-second visual bite warning before aiming starts. Fish weight also favours the middle of a species-specific range. Sale value is the species rate multiplied by kilograms, rounded to whole coins. Catch and escape panels show the fish name; catches also show weight and value. Casts have a placeholder rod, splash and bobber, with player casting/bite reactions. The player bobs while walking and the shop sign reacts to proximity.
 
@@ -69,6 +73,7 @@ godot --headless --path . --script res://tests/prototype_progress_test.gd
 godot --headless --path . --script res://tests/prototype_loop_test.gd
 godot --headless --path . --script res://tests/prototype_input_test.gd
 godot --headless --path . --script res://tests/prototype_reset_test.gd
+godot --headless --path . --script res://tests/prototype_recovery_test.gd
 ```
 
 ## Credits

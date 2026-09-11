@@ -1,6 +1,8 @@
 extends CanvasLayer
 ## Temporary interface: replace visuals without changing prototype rules.
 
+signal retry_load_requested
+signal fresh_start_requested
 signal journal_requested
 signal pause_requested
 signal close_requested
@@ -12,6 +14,7 @@ signal reset_requested
 signal reset_confirmed
 signal reset_cancelled
 
+var collection: Label
 var stats: Label
 var hint: Label
 var notice: Label
@@ -52,8 +55,12 @@ func _ready() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 18)
 	top.add_child(row)
-	stats = _label("", row)
-	stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var summary := VBoxContainer.new()
+	summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(summary)
+	stats = _label("", summary)
+	collection = _label("", summary)
+	collection.add_theme_font_size_override("font_size", 16)
 	journal_button = _button("Fish journal [Tab]", row, func(): journal_requested.emit())
 	pause_button = _button("Pause [Esc]", row, func(): pause_requested.emit())
 	var bottom := PanelContainer.new()
@@ -97,6 +104,20 @@ func _ready() -> void:
 
 func update_stats(coins: int, bag_count: int) -> void:
 	stats.text = "FISHGEM   •   %d coins   •   %d fish" % [coins, bag_count]
+
+func update_collection(found: int, total: int) -> void:
+	collection.text = "Collect every fish  •  %d/%d species — journal has hints!" % [found, total]
+	if found == total:
+		collection.text = "Collection complete!  •  %d/%d species found" % [found, total]
+
+func show_save_recovery() -> void:
+	set_modal("Your save could not be loaded")
+	_wrapped_label("Your existing save has not been changed.
+Retry loading, or start fresh and keep the old file for recovery.
+Quitting here leaves your save untouched.", modal_body)
+	_button("Retry loading", modal_actions, func(): retry_load_requested.emit()).grab_focus()
+	_button("Start fresh & preserve old save", modal_actions, func(): fresh_start_requested.emit())
+	_button("Quit without saving", modal_actions, func(): quit_requested.emit())
 
 func set_modal(title: String) -> void:
 	_stop_result_animation()

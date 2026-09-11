@@ -16,6 +16,8 @@ var bite_timer: Timer
 var save_path := "user://fishgem_prototype.json"
 var _shore_hint := "WASD / arrows: walk. Find the water and press E."
 var _fishing_spot := "home_bank"
+var _save_load_failed := false
+var _preserved_save_path := ""
 
 func _ready() -> void:
 	world = World.instantiate()
@@ -44,19 +46,57 @@ func _ready() -> void:
 	ui.reset_requested.connect(_request_save_reset)
 	ui.reset_confirmed.connect(_confirm_save_reset)
 	ui.reset_cancelled.connect(_cancel_save_reset)
+	ui.retry_load_requested.connect(_load_progress)
+	ui.fresh_start_requested.connect(_start_fresh_after_load_failure)
 	fishing.caught.connect(_on_caught)
 	fishing.escaped.connect(_on_escaped)
 	fishing.cancelled.connect(func(): _end_encounter("Line reeled in. Nothing lost."))
 	fishing.introduction_completed.connect(_on_introduction_completed)
 	get_tree().auto_accept_quit = false
-	var result: Error = progress.load_game(save_path)
-	ui.notice.text = "Progress loaded. Welcome back!" if result == OK else "Walk to the shore and catch your first fish."
-	if result != OK and result != ERR_FILE_NOT_FOUND:
-		ui.notice.text = "Save could not be loaded; using a fresh session."
-	_update_stats()
+	_load_progress()
 	_on_hint(world.hint)
 
+func _load_progress() -> void:
+	var result: Error = progress.load_game(save_path)
+	# Once recovery is open, a missing file is not permission to silently start over.
+	if result != OK and (result != ERR_FILE_NOT_FOUND or _save_load_failed):
+		_save_load_failed = true
+		_set_mode("save_recovery")
+		ui.show_save_recovery()
+	else:
+		_save_load_failed = false
+		_return_to_world()
+		ui.notice.text = "Progress loaded. Welcome back!" if result == OK else "Walk to the shore and catch your first fish."
+	_update_stats()
+
+func _start_fresh_after_load_failure() -> void:
+	if mode != "save_recovery":
+		return
+	# Keep the exact original bytes, including saves from a newer game version.
+	# Unique names ensure repeated recoveries never replace an earlier original.
+	if _preserved_save_path.is_empty() and FileAccess.file_exists(save_path):
+		var archive := save_path + ".unreadable"
+		var suffix := 1
+		while FileAccess.file_exists(archive):
+			archive = save_path + ".unreadable.%d" % suffix
+			suffix += 1
+		if DirAccess.rename_absolute(ProjectSettings.globalize_path(save_path), ProjectSettings.globalize_path(archive)) != OK:
+			ui.modal_title.text = "Could not preserve your save. Try again."
+			return
+		_preserved_save_path = archive
+	var fresh = Progress.new()
+	if fresh.save_game(save_path) != OK:
+		ui.modal_title.text = "Could not create a new save. Try again."
+		return
+	progress = fresh
+	_save_load_failed = false
+	_return_to_world()
+	_update_stats()
+	ui.notice.text = "A fresh start! Your previous save has been kept." if not _preserved_save_path.is_empty() else "A fresh start awaits!"
+
 func _input(event: InputEvent) -> void:
+	if _save_load_failed:
+		return
 	# Handle Tab before GUI focus traversal consumes the journal shortcut.
 	if not event is InputEventKey or not event.is_pressed() or event.is_echo():
 		return
@@ -154,6 +194,8 @@ func _end_encounter(message: String) -> void:
 	_update_stats()
 
 func _return_to_world() -> void:
+	if _save_load_failed:
+		return
 	if mode == "waiting" or mode == "bite":
 		ui.notice.text = "Line reeled in. Cast again whenever you like."
 	bite_timer.stop()
@@ -230,15 +272,18 @@ func _on_hint(message: String) -> void:
 
 func _update_stats() -> void:
 	ui.update_stats(progress.coins, progress.bag.size())
+	ui.update_collection(progress.discovered.size(), progress.FISH.size())
 
 func _save_progress() -> bool:
+	if _save_load_failed:
+		return false
 	if progress.save_game(save_path) != OK:
 		ui.notice.text = "Could not save progress. Keep this session open and try again."
 		return false
 	return true
 
 func _quit_game() -> void:
-	if _save_progress():
+	if _save_load_failed or _save_progress():
 		get_tree().quit()
 
 func _notification(what: int) -> void:
