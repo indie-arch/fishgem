@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 godot_bin="${GODOT:-godot}"
 version="${1:-v0.1}"
-[[ "$version" =~ ^v[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || { echo 'Expected version such as v0.1 or v0.1.0' >&2; exit 1; }
+[[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo 'Expected a filename-safe release tag (letters, numbers, dots, underscores, hyphens)' >&2; exit 1; }
 [[ "$("$godot_bin" --version)" == 4.7.2.stable.* ]] || { echo 'Godot 4.7.2 stable is required' >&2; exit 1; }
 # Only generated output is removed.
 rm -rf build/linux build/windows build/macos dist

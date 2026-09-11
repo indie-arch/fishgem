@@ -27,11 +27,11 @@ Exports include game resources (including fish textures loaded dynamically), exc
    git push origin v0.1
    ```
 
-5. The workflow creates a **draft** GitHub release containing all three archives and checksums. Inspect the downloads and notes, make the repository public when ready, then publish the draft from GitHub Releases.
+5. Alternatively, create and publish a release directly in GitHub: binaries will be attached automatically once the build succeeds. For pushed `v*` tags, the workflow creates a **draft** GitHub release containing all three archives and checksums. Inspect the downloads and notes, make the repository public when ready, then publish the draft from GitHub Releases.
 
-No signing secrets are required. The release job alone receives `contents: write`; PR builds cannot create releases. Reruns can replace draft assets but refuse to modify a published release. Keep tags immutable after publication.
+No signing secrets are required. The release job alone receives `contents: write`; PR builds cannot create releases. Publishing a release in GitHub also triggers a build from its tag and attaches all three binaries and checksums, including releases with non-version tags. Reruns replace matching generated assets on existing releases; other attachments and release notes are preserved. Keep tags immutable after publication.
 
-For future releases, update `config/version` in `project.godot`, macOS application versions in `export_presets.cfg`, and the player/release notes before tagging. Tags accept `vMAJOR.MINOR` or `vMAJOR.MINOR.PATCH`. To upgrade Godot, update both download/version references in the workflow and the build script version check together.
+For future releases, update `config/version` in `project.godot`, macOS application versions in `export_presets.cfg`, and the player/release notes before tagging. Prefer tags such as `v0.1.0`; package names use the tag. Tags must contain only letters, numbers, dots, underscores, or hyphens and start with a letter or number. To upgrade Godot, update both download/version references in the workflow and the build script version check together.
 
 ## Signing
 
