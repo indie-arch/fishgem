@@ -262,7 +262,7 @@ func _upgrade(kind: String) -> void:
 		return
 	ui.notice.text = {"ease": "Steady grip upgraded — easier aiming!", "weight": "Heavy lure upgraded — heavier fish on average!", "speed": "Quick bite upgraded — shorter waits!"}.get(kind, "Rod upgraded!")
 	_update_stats()
-	ui.show_shop(progress)
+	ui.refresh_shop_upgrades(progress)
 	_save_progress()
 
 func _on_hint(message: String) -> void:

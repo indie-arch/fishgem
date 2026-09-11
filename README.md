@@ -78,7 +78,11 @@ godot --headless --path . --script res://tests/prototype_loop_test.gd
 godot --headless --path . --script res://tests/prototype_input_test.gd
 godot --headless --path . --script res://tests/prototype_reset_test.gd
 godot --headless --path . --script res://tests/prototype_recovery_test.gd
+godot --headless --path . --script res://tests/prototype_optimization_test.gd
+godot --headless --path . --script res://tests/fishing_render_test.gd
 ```
+
+Run `godot --path . --script res://tests/fishing_render_test.gd` with a display to also check the actual renderer's drawing cache. Run `godot --headless --path . --script res://tests/performance_benchmark.gd` for inventory, shop and save timings. See [performance notes](docs/PERFORMANCE.md) for scope and measurements.
 
 ## Credits
 

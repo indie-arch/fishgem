@@ -12,6 +12,7 @@ const SHOP_CELL := Vector2i(3, 0)
 const SPAWN_CELL := Vector2i(1, 3)
 const SPOT_IDS := ["west_bank", "home_bank", "east_bank"]
 const NEIGHBORS := [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]
+const FOOT_OFFSETS := [Vector2(-9, -9), Vector2(9, -9), Vector2(-9, 9), Vector2(9, 9)]
 var input_enabled := true
 var hint := ""
 var player: Node2D
@@ -24,6 +25,7 @@ var shore_max_x := 0.0
 var shop_sign: Label
 var shop_sign_phase := 0.0
 var shop_attention := 0.0
+var _hint_context := ""
 
 func _ready() -> void:
 	var painted_world := PAINTED_WORLD.instantiate()
@@ -52,8 +54,12 @@ func _physics_process(delta: float) -> void:
 	_update_hint()
 
 func _process(delta: float) -> void:
+	var previous_attention := shop_attention
 	shop_attention = move_toward(shop_attention, 1.0 if input_enabled and is_near_shop() else 0.0, delta * 4.0)
 	shop_sign_phase = fmod(shop_sign_phase + delta * 3.5, TAU)
+	# Keep the phase advancing so approaching the shop has identical animation.
+	if shop_attention == 0.0 and previous_attention == 0.0:
+		return
 	shop_sign.position = shop_position + Vector2(-34, -63 - absf(sin(shop_sign_phase)) * 3.0 * shop_attention)
 	shop_sign.rotation = sin(shop_sign_phase) * 0.035 * shop_attention
 
@@ -78,7 +84,7 @@ func is_land(cell: Vector2i) -> bool:
 	return atlas.y >= 0 and atlas.y <= 2 and atlas.x >= 0 and atlas.x < 10
 
 func can_stand(point: Vector2) -> bool:
-	for offset in [Vector2(-9, -9), Vector2(9, -9), Vector2(-9, 9), Vector2(9, 9)]:
+	for offset in FOOT_OFFSETS:
 		if not is_land(ground.local_to_map(point + offset)):
 			return false
 	return true
@@ -185,13 +191,24 @@ func end_cast() -> void:
 		player.end_cast()
 
 func _update_hint() -> void:
+	# Keep live tile checks for map edits, but format text only when the interaction changes.
+	var context := "disabled"
+	if input_enabled:
+		context = "world"
+		if is_near_shop():
+			context = "shop"
+		elif is_near_water():
+			context = get_fishing_spot()
+	if context == _hint_context:
+		return
+	_hint_context = context
 	var next := "WASD / arrows: walk · E: interact · Tab: journal"
-	if not input_enabled:
+	if context == "disabled":
 		next = ""
-	elif is_near_shop():
+	elif context == "shop":
 		next = "E: shop — sell fish and buy upgrades"
-	elif is_near_water():
-		var spot: Dictionary = Progress.FISHING_SPOTS[get_fishing_spot()]
+	elif context != "world":
+		var spot: Dictionary = Progress.FISHING_SPOTS[context]
 		next = "E: cast at %s — %s" % [spot["name"], spot["hint"]]
 	if next != hint:
 		hint = next

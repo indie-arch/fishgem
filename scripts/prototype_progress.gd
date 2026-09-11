@@ -37,6 +37,14 @@ var bag: Array[Dictionary] = []
 var discovered: Dictionary = {}
 var best_weights: Dictionary = {}
 var fishing_intro_seen: bool = false
+static var _species_by_id: Dictionary = _index_species()
+
+
+static func _index_species() -> Dictionary:
+	var definitions := {}
+	for fish in FISH:
+		definitions[fish.id] = fish
+	return definitions
 
 
 func fish_catalog() -> Array[Dictionary]:
@@ -44,10 +52,12 @@ func fish_catalog() -> Array[Dictionary]:
 
 
 func fish_by_id(species_id: String) -> Dictionary:
-	for fish in FISH:
-		if fish.id == species_id:
-			return fish.duplicate(true)
-	return {}
+	# Encounter callers can modify their copy; pricing and validation need no copy.
+	return _species_by_id.get(species_id, {}).duplicate(true)
+
+
+func fish_name(species_id: String) -> String:
+	return str(_species_by_id.get(species_id, {}).get("name", ""))
 
 
 func roll_fish(spot_id: String = "home_bank") -> Dictionary:
@@ -83,7 +93,7 @@ func add_catch(fish: Dictionary) -> void:
 func sale_value(fish: Dictionary) -> int:
 	if not _valid_catch(fish):
 		return 0
-	return maxi(1, roundi(fish_by_id(fish.id).price * fish.weight_kg))
+	return maxi(1, roundi(_species_by_id[fish.id].price * fish.weight_kg))
 
 
 func journal_complete() -> bool:
@@ -139,7 +149,8 @@ func save_game(path: String = SAVE_PATH) -> Error:
 	var file := FileAccess.open(temporary_path, FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
-	file.store_string(JSON.stringify({"version": 3, "coins": coins, "upgrades": upgrades, "bag": bag, "discovered": discovered, "best_weights": best_weights, "fishing_intro_seen": fishing_intro_seen}))
+	# Key ordering has no meaning in saves; avoid sorting every catch dictionary.
+	file.store_string(JSON.stringify({"version": 3, "coins": coins, "upgrades": upgrades, "bag": bag, "discovered": discovered, "best_weights": best_weights, "fishing_intro_seen": fishing_intro_seen}, "", false))
 	file.flush()
 	var write_error := file.get_error()
 	file.close()
@@ -183,7 +194,7 @@ func load_game(path: String = SAVE_PATH) -> Error:
 			return ERR_FILE_CORRUPT
 		loaded_bag.append({"id": fish.id, "weight_kg": float(fish.weight_kg)})
 	for species_id in data.discovered:
-		if not species_id is String or fish_by_id(species_id).is_empty() or not _valid_integer(data.discovered[species_id], 0, 1000000000):
+		if not species_id is String or not _species_by_id.has(species_id) or not _valid_integer(data.discovered[species_id], 0, 1000000000):
 			return ERR_FILE_CORRUPT
 	var loaded_best_weights: Dictionary = {}
 	var loaded_intro_seen := false
@@ -212,7 +223,7 @@ func load_game(path: String = SAVE_PATH) -> Error:
 
 
 func _valid_catch(fish: Dictionary) -> bool:
-	if not fish.get("id") is String or fish_by_id(fish.id).is_empty():
+	if not fish.get("id") is String or not _species_by_id.has(fish.id):
 		return false
 	var weight: Variant = fish.get("weight_kg")
 	if not (weight is int or weight is float):

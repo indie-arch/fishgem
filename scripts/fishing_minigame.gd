@@ -42,12 +42,17 @@ var _turn_time := 0.9
 var _feedback := "Click the swimming fish!"
 var _fish_color := Color("efbd62")
 var _texture: Texture2D
+var _background: Node2D
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	resized.connect(queue_redraw)
+	_background = Node2D.new()
+	_background.show_behind_parent = true
+	add_child(_background)
+	_background.draw.connect(_draw_background)
+	resized.connect(_redraw_all)
 	if not active:
 		hide()
 		set_process(false)
@@ -84,15 +89,16 @@ func start_fishing(fish: Dictionary, rod_level: int = 0, show_intro: bool = fals
 	active = true
 	introducing = show_intro
 	show()
-	set_process(true)
+	set_process(not introducing)
 	set_process_input(true)
-	queue_redraw()
+	_redraw_all()
 
 
 func dismiss_introduction() -> void:
 	if not active or not introducing:
 		return
 	introducing = false
+	set_process(true)
 	introduction_completed.emit()
 	queue_redraw()
 
@@ -255,16 +261,7 @@ func _design_origin() -> Vector2:
 func _draw() -> void:
 	if not active:
 		return
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.08, 0.15, 0.14, 0.70))
 	draw_set_transform(_design_origin(), 0.0, Vector2.ONE * _design_scale())
-	draw_rect(Rect2(Vector2(5, 7), DESIGN_SIZE), Color("142e2c"))
-	draw_rect(Rect2(Vector2.ZERO, DESIGN_SIZE), PAPER)
-	draw_rect(Rect2(Vector2.ZERO, DESIGN_SIZE), INK, false, 5.0)
-	_text(Vector2(32, 43), "FISH ON!", 28, INK)
-	_text(Vector2(32, 78), "Click inside the ring. Keep the gold marker ahead of red!", 19, INK)
-	_text(Vector2(626, 43), "ESC  leave", 16, INK)
-	draw_rect(POND, Color("70b8bb"))
-	draw_rect(POND, INK, false, 4.0)
 	for index in range(9):
 		var wave_y := POND.position.y + 24.0 + index * 29.0
 		var wave_x := POND.position.x + 30.0 + fmod(index * 97.0 + _elapsed * 9.0, 540.0)
@@ -287,6 +284,29 @@ func _draw() -> void:
 	if introducing:
 		_draw_introduction()
 	draw_set_transform(Vector2.ZERO)
+
+
+func _redraw_all() -> void:
+	queue_redraw()
+	if is_instance_valid(_background):
+		_background.queue_redraw()
+
+
+func _draw_background() -> void:
+	# Static commands stay cached while the fish, waves and catch bar animate.
+	if not active:
+		return
+	_background.draw_rect(Rect2(Vector2.ZERO, size), Color(0.08, 0.15, 0.14, 0.70))
+	_background.draw_set_transform(_design_origin(), 0.0, Vector2.ONE * _design_scale())
+	_background.draw_rect(Rect2(Vector2(5, 7), DESIGN_SIZE), Color("142e2c"))
+	_background.draw_rect(Rect2(Vector2.ZERO, DESIGN_SIZE), PAPER)
+	_background.draw_rect(Rect2(Vector2.ZERO, DESIGN_SIZE), INK, false, 5.0)
+	_text(Vector2(32, 43), "FISH ON!", 28, INK, _background)
+	_text(Vector2(32, 78), "Click inside the ring. Keep the gold marker ahead of red!", 19, INK, _background)
+	_text(Vector2(626, 43), "ESC  leave", 16, INK, _background)
+	_background.draw_rect(POND, Color("70b8bb"))
+	_background.draw_rect(POND, INK, false, 4.0)
+	_background.draw_set_transform(Vector2.ZERO)
 
 
 func _draw_introduction() -> void:
@@ -373,5 +393,5 @@ func _draw_fish() -> void:
 	draw_circle(eye + Vector2(direction, 0), 2.5, INK)
 
 
-func _text(position_at: Vector2, value: String, font_size: int, color: Color) -> void:
-	draw_string(ThemeDB.fallback_font, position_at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+func _text(position_at: Vector2, value: String, font_size: int, color: Color, canvas: CanvasItem = self) -> void:
+	canvas.draw_string(ThemeDB.fallback_font, position_at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)

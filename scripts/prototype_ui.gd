@@ -1,5 +1,6 @@
 extends CanvasLayer
 ## Temporary interface: replace visuals without changing prototype rules.
+const CatchList = preload("res://scripts/catch_list.gd")
 
 signal retry_load_requested
 signal fresh_start_requested
@@ -27,6 +28,10 @@ var journal_button: Button
 var pause_button: Button
 var _screen: Control
 var _result_tween: Tween
+var _shop_upgrade_buttons: Dictionary = {}
+var _shop_upgrade_details: Dictionary = {}
+var _shop_inventory: ScrollContainer
+var _shop_back: Button
 
 func _ready() -> void:
 	_screen = Control.new()
@@ -121,6 +126,10 @@ Quitting here leaves your save untouched.", modal_body)
 
 func set_modal(title: String) -> void:
 	_stop_result_animation()
+	_shop_upgrade_buttons.clear()
+	_shop_upgrade_details.clear()
+	_shop_inventory = null
+	_shop_back = null
 	modal_title.text = title
 	for container in [modal_body, modal_actions]:
 		for child in container.get_children():
@@ -182,19 +191,34 @@ func _stop_result_animation() -> void:
 func show_shop(progress) -> void:
 	set_modal("Bait & bits")
 	_wrapped_label("Fish value = species rate × weight.\nEach rod upgrade improves just one thing.", modal_body)
+	var total_value := 0
 	if not progress.bag.is_empty():
 		var scroll := ScrollContainer.new()
+		_shop_inventory = scroll
 		scroll.custom_minimum_size.y = minf(110.0, progress.bag.size() * 27.0)
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		modal_body.add_child(scroll)
-		var catches := VBoxContainer.new()
+		var catches := CatchList.new()
 		catches.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		scroll.add_child(catches)
+		var rows := PackedStringArray()
 		for caught_fish in progress.bag:
-			var fish: Dictionary = progress.fish_by_id(caught_fish.id)
-			_wrapped_label("%s  •  %.2f kg  •  %d coins" % [fish.name, caught_fish.weight_kg, progress.sale_value(caught_fish)], catches)
-	var sell := _button("Sell %d fish for %d coins" % [progress.bag.size(), progress.bag_value()], modal_body, func(): sell_requested.emit())
+			var value: int = progress.sale_value(caught_fish)
+			total_value += value
+			rows.append("%s  •  %.2f kg  •  %d coins" % [progress.fish_name(caught_fish.id), caught_fish.weight_kg, value])
+		catches.rows = rows
+		scroll.add_child(catches)
+	var sell := _button("Sell %d fish for %d coins" % [progress.bag.size(), total_value], modal_body, func(): sell_requested.emit())
 	sell.disabled = progress.bag.is_empty()
+	for kind in ["ease", "weight", "speed"]:
+		_shop_upgrade_buttons[kind] = _button("", modal_body, _request_upgrade.bind(kind))
+		_shop_upgrade_details[kind] = _wrapped_label("", modal_body)
+	_shop_back = _button("Back to the bank [Esc]", modal_actions, func(): close_requested.emit())
+	refresh_shop_upgrades(progress)
+
+func refresh_shop_upgrades(progress) -> void:
+	# A purchase changes only coins and upgrade levels, never the bag or its rows.
+	if not is_instance_valid(_shop_back):
+		return
 	var names := {"ease": "Steady grip", "weight": "Heavy lure", "speed": "Quick bite"}
 	var effects := {"ease": "Target radius bonus", "weight": "Catch weight multiplier", "speed": "Average bite wait"}
 	for kind in ["ease", "weight", "speed"]:
@@ -202,7 +226,8 @@ func show_shop(progress) -> void:
 		var cost: int = progress.upgrade_cost(kind)
 		var maxed: bool = level >= progress.MAX_UPGRADE_LEVEL
 		var suffix := "MAX" if maxed else "%d coins" % cost
-		var upgrade := _button("%s  [%d/%d]  •  %s" % [names[kind], level, progress.MAX_UPGRADE_LEVEL, suffix], modal_body, _request_upgrade.bind(kind))
+		var upgrade: Button = _shop_upgrade_buttons[kind]
+		upgrade.text = "%s  [%d/%d]  •  %s" % [names[kind], level, progress.MAX_UPGRADE_LEVEL, suffix]
 		upgrade.disabled = maxed or progress.coins < cost
 		var current := _upgrade_value(kind, progress.upgrade_effect(kind, level))
 		var effect_text := "%s: %s (maximum benefit)" % [effects[kind], current]
@@ -210,8 +235,12 @@ func show_shop(progress) -> void:
 			var next := _upgrade_value(kind, progress.upgrade_effect(kind, level + 1))
 			var affordability := "Ready to buy" if progress.coins >= cost else "Need %d more coins" % (cost - progress.coins)
 			effect_text = "%s: %s → %s\n%s" % [effects[kind], current, next, affordability]
-		_wrapped_label(effect_text, modal_body)
-	_button("Back to the bank [Esc]", modal_actions, func(): close_requested.emit()).grab_focus()
+		_shop_upgrade_details[kind].text = effect_text
+	# Preserve the old rebuild's scroll reset and keyboard focus.
+	modal_scroll.scroll_vertical = 0
+	if is_instance_valid(_shop_inventory):
+		_shop_inventory.scroll_vertical = 0
+	_shop_back.grab_focus()
 
 func _upgrade_value(kind: String, value: float) -> String:
 	match kind:

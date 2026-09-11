@@ -30,6 +30,9 @@ func walk(delta: float, can_stand: Callable) -> void:
 		float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)) - float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),
 		float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN)) - float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP))
 	).normalized()
+	if direction == Vector2.ZERO:
+		rest()
+		return
 	var previous_position := position
 	var motion := direction * WALK_SPEED * delta
 	# Substeps keep the foot marker on land even after a long frame.
@@ -37,10 +40,10 @@ func walk(delta: float, can_stand: Callable) -> void:
 	motion /= steps
 	for step in steps:
 		var next := position + Vector2(motion.x, 0)
-		if can_stand.call(next):
+		if motion.x != 0.0 and can_stand.call(next):
 			position = next
 		next = position + Vector2(0, motion.y)
-		if can_stand.call(next):
+		if motion.y != 0.0 and can_stand.call(next):
 			position = next
 	var distance := position.distance_to(previous_position)
 	if distance < 0.01:
