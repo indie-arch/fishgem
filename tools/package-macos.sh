@@ -10,6 +10,6 @@ mkdir "$package_dir/volume"
 ditto -x -k "dist/FishGem-$version-macos-universal.zip" "$package_dir/volume"
 ln -s /Applications "$package_dir/volume/Applications"
 codesign --verify --deep --strict "$package_dir/volume/fishgem.app"
-lipo -verify_arch x86_64 arm64 "$package_dir/volume/fishgem.app/Contents/MacOS/fishgem"
+lipo "$package_dir/volume/fishgem.app/Contents/MacOS/fishgem" -verify_arch x86_64 arm64
 hdiutil create -volname FishGem -srcfolder "$package_dir/volume" -ov -format UDZO "dist/FishGem-$version-macos-universal.dmg"
 hdiutil verify "dist/FishGem-$version-macos-universal.dmg"
