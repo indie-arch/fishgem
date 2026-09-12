@@ -8,21 +8,62 @@ on:
     types: [published]
   pull_request:
   workflow_dispatch:
+    inputs:
+      existing_release:
+        description: 'Existing release tag to repackage (blank builds current source)'
+        type: string
+        default: ''
+      package_version:
+        description: 'Version in existing archive filenames, e.g. v0.1.0'
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 concurrency:
-  group: desktop-${{ github.ref }}
+  group: desktop-${{ github.ref }}-${{ inputs.existing_release }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+      - name: Select package version
+        id: version
+        env:
+          EXISTING_RELEASE: ${{ inputs.existing_release }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+          DEFAULT_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1' }}
+        run: |
+          version="${PACKAGE_VERSION:-$DEFAULT_VERSION}"
+          [[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || exit 1
+          if [[ -n "$EXISTING_RELEASE" && -z "$PACKAGE_VERSION" ]]; then
+            echo 'package_version is required for an existing release' >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Download existing release archives
+        if: inputs.existing_release != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.existing_release }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p dist
+          gh release download "$RELEASE_TAG" --dir dist --pattern "FishGem-$VERSION-*.zip" --pattern "FishGem-$VERSION-*.tar.gz" --pattern SHA256SUMS.txt
+          # Verify just the source archives; the release may also contain installers.
+          cd dist
+          grep -E '\.(zip|tar.gz)$' SHA256SUMS.txt > archive-sums.txt
+          test "$(wc -l < archive-sums.txt)" -eq 3
+          sha256sum -c archive-sums.txt
+          rm archive-sums.txt
       - name: Install Godot and matching export templates
+        if: inputs.existing_release == ''
         shell: bash
         run: |
           set -euo pipefail
@@ -42,12 +83,15 @@ jobs:
           mkdir -p "$HOME/.local/share/godot/export_templates/4.7.2.stable"
           mv godot-templates/templates/* "$HOME/.local/share/godot/export_templates/4.7.2.stable/"
       - name: Import and run regression checks
+        if: inputs.existing_release == ''
         run: tools/check.sh
       - name: Build and package desktop binaries
+        if: inputs.existing_release == ''
         env:
-          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1' }}
+          RELEASE_TAG: ${{ steps.version.outputs.version }}
         run: tools/build.sh "$RELEASE_TAG"
       - name: Smoke test Linux binary
+        if: inputs.existing_release == ''
         shell: bash
         run: |
           set -euo pipefail
@@ -55,6 +99,12 @@ jobs:
           cd "$(mktemp -d)"
           XDG_DATA_HOME="$PWD" timeout 60 "$binary" --headless --quit-after 10 2>&1 | tee smoke.log
           ! grep -Eq 'SCRIPT ERROR:|^ERROR:' smoke.log
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y nsis desktop-file-utils
+      - name: Package AppImage and Windows installer
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: tools/package-installers.sh "$VERSION"
       - uses: actions/upload-artifact@v4
         with:
           name: fishgem-desktop
@@ -62,9 +112,54 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  release:
-    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
+  macos:
     needs: build
+    timeout-minutes: 15
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: fishgem-desktop
+          path: dist
+      - name: Package and verify DMG
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: tools/package-macos.sh "$VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fishgem-dmg
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  windows:
+    needs: build
+    timeout-minutes: 15
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: fishgem-desktop
+          path: dist
+      - name: Verify install, launch, and uninstall
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem dist/*-setup.exe).FullName
+          $process = Start-Process $setup -ArgumentList '/S' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          $install = "$env:LOCALAPPDATA\Programs\FishGem"
+          if (!(Test-Path "$install\FishGem.exe")) { throw 'Game was not installed' }
+          $game = Start-Process "$install\FishGem.exe" -ArgumentList '--headless','--quit-after','10' -PassThru -RedirectStandardError "$env:RUNNER_TEMP\game-errors.txt"
+          if (!$game.WaitForExit(60000)) { $game.Kill(); throw 'Game launch timed out' }
+          if ($game.ExitCode -ne 0) { throw 'Game launch failed' }
+          if (Select-String -Path "$env:RUNNER_TEMP\game-errors.txt" -Pattern 'SCRIPT ERROR:|^ERROR:') { throw 'Game logged errors' }
+          Copy-Item "$install\Uninstall.exe" "$env:RUNNER_TEMP\FishGem-uninstall.exe"
+          $uninstall = Start-Process "$env:RUNNER_TEMP\FishGem-uninstall.exe" -ArgumentList '/S',"_?=$install" -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0 -or (Test-Path "$install\FishGem.exe")) { throw 'Uninstall failed' }
+
+  release:
+    if: inputs.existing_release != '' || github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
+    needs: [build, macos, windows]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -74,10 +169,18 @@ jobs:
         with:
           name: fishgem-desktop
           path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: fishgem-dmg
+          path: dist
+      - name: Update checksums for all downloads
+        run: |
+          cd dist
+          sha256sum *.tar.gz *.zip *.AppImage *-setup.exe *.dmg > SHA256SUMS.txt
       - name: Attach binaries to release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ inputs.existing_release || github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail

@@ -1,8 +1,11 @@
 # Playing FishGem v0.1
 
-Extract the entire download before launching. You do not need Godot installed.
+You do not need Godot installed. Choose the AppImage, Windows setup installer, or macOS DMG for the simplest installation. Portable archives are also available; extract those completely before launching.
 
-- **Linux x64:** run `./FishGem.x86_64`. If your extractor drops permissions, run `chmod +x FishGem.x86_64` first.
+- **Linux AppImage:** mark the `.AppImage` as executable in your file manager, then double-click it. Alternatively run `chmod +x FishGem-*.AppImage` followed by `./FishGem-v0.1.0-linux-x86_64.AppImage`. If mounting is unavailable, run it with `--appimage-extract-and-run`.
+- **Windows installer:** run the `-setup.exe` download. It installs into your user account and adds FishGem to the Start menu. Uninstall through Windows Settings → Apps; saves are preserved.
+- **macOS DMG:** open the `.dmg`, drag `fishgem.app` onto Applications, then eject the disk image and open the app from Applications.
+- **Linux portable archive:** run `./FishGem.x86_64`. If your extractor drops permissions, run `chmod +x FishGem.x86_64` first.
 - **Windows x64:** double-click `FishGem.exe`. This prototype is not code-signed; Windows may show a publisher warning.
 - **macOS (Intel and Apple Silicon):** drag `fishgem.app` to Applications and open it. This prototype is ad-hoc signed, not notarized. If macOS blocks it, use System Settings → Privacy & Security → Open Anyway after attempting to open it, only if you trust this download. See https://docs.godotengine.org/en/4.7/tutorials/export/running_on_macos.html.
 

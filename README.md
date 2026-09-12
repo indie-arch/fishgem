@@ -6,7 +6,7 @@ A small single-player Godot 4 fishing prototype inspired by WEBFISHING. Walk aro
 
 ## Downloads and releases
 
-Desktop packages for Linux x64, Windows x64, and macOS Intel / Apple Silicon are built by GitHub Actions. Published downloads will appear on [GitHub Releases](https://github.com/indie-arch/fishgem/releases). See [playing a downloaded build](docs/PLAYING.md) and [building / publishing a release](docs/RELEASING.md).
+AppImage packages for Linux x64, setup installers for Windows x64, and DMGs for macOS Intel / Apple Silicon are built by GitHub Actions. Published downloads will appear on [GitHub Releases](https://github.com/indie-arch/fishgem/releases). See [playing a downloaded build](docs/PLAYING.md) and [building / publishing a release](docs/RELEASING.md).
 
 ## Play
 

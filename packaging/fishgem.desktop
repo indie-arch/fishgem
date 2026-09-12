@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=FishGem
+Comment=A cozy fishing prototype
+Exec=FishGem
+Icon=fishgem
+Categories=Game;
+Terminal=false

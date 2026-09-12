@@ -2,11 +2,11 @@ First public FishGem prototype: explore three shoreline areas, catch six fish ar
 
 ## Downloads
 
-- Linux x64: `linux-x86_64.tar.gz`
-- Windows x64: `windows-x86_64.zip`
-- macOS Intel / Apple Silicon: `macos-universal.zip`
+- Linux x64: `.AppImage` (mark executable, then launch)
+- Windows x64: `-setup.exe` installer (includes Start menu shortcut and uninstall)
+- macOS Intel / Apple Silicon: `.dmg` (drag the app to Applications)
 
-Extract the full archive and read the included README. Godot is not required.
+Portable tar.gz / ZIP downloads are also available. Read the included README. Godot is not required.
 
 Windows builds are unsigned; macOS builds are ad-hoc signed and not notarized. macOS may require Privacy & Security → Open Anyway. This is an early prototype with placeholder art and provisional balancing.
 
