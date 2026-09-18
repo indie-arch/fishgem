@@ -1,4 +1,13 @@
-First public FishGem prototype: explore three shoreline areas, catch six fish archetypes, sell your haul, upgrade your rod, and complete the fish journal. Progress saves automatically.
+FishGem v0.1.1 adds rare holographic fish to the shoreline prototype.
+
+## What’s new
+
+- Every species now has a holographic variant with an animated rainbow shimmer and a 1 in 200 chance per bite.
+- Holographic encounters swim 30% faster, advance danger 30% faster, and require three extra hits.
+- The bag identifies holographic catches, and the journal tracks their lifetime counts and personal best weights separately. They also count toward discovering the base species.
+- Desktop packaging includes a Linux AppImage, Windows installer, and universal macOS DMG, alongside portable archives.
+
+Existing progress is preserved. Holographic fish use the normal species and weight sale prices.
 
 ## Downloads
 
