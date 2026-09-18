@@ -258,36 +258,63 @@ func _request_upgrade(kind: String) -> void:
 	upgrade_requested.emit(kind)
 
 func show_journal(progress) -> void:
-	set_modal("Fish journal   •   %d / %d discovered" % [progress.discovered_species_count(), progress.FISH.size()])
+	set_modal("Fish journal   •   %d / %d species found" % [progress.discovered_species_count(), progress.FISH.size()])
 	if progress.journal_complete():
-		var celebration := _wrapped_label("JOURNAL COMPLETE! Every fish found. Nice fishing!", modal_body)
+		var celebration := _wrapped_label("All six species found. Nice fishing!", modal_body)
 		celebration.add_theme_color_override("font_color", Color("397046"))
+	_wrapped_label("Catch fish to record your personal bests. Your records stay after selling.", modal_body)
 	var catalog: Array = progress.fish_catalog(true)
+	var bonus_found := 0
+	for fish in catalog:
+		if fish.get("holographic", false) and int(progress.discovered.get(fish.id, 0)) > 0:
+			bonus_found += 1
 	for fish_index in catalog.size():
+		if fish_index == 0:
+			_journal_heading("River fish", "Every species can bite at every bank. The spots below give better odds.")
+		elif fish_index == progress.FISH.size():
+			_journal_heading("Bonus holographic fish   •   %d / %d found" % [bonus_found, progress.FISH.size()],
+				"Rare shimmering versions: 1 in 200 bites. Faster and harder to reel in. These are optional extras.")
 		var fish: Dictionary = catalog[fish_index]
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 14)
-		modal_body.add_child(row)
 		var count := int(progress.discovered.get(fish.id, 0))
+		var card := PanelContainer.new()
+		var card_style := StyleBoxFlat.new()
+		card_style.bg_color = Color("e7dcc2") if count == 0 else Color("dce5c9")
+		card_style.content_margin_left = 12
+		card_style.content_margin_right = 12
+		card_style.content_margin_top = 10
+		card_style.content_margin_bottom = 10
+		card.add_theme_stylebox_override("panel", card_style)
+		modal_body.add_child(card)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 16)
+		card.add_child(row)
 		var icon := TextureRect.new()
-		icon.custom_minimum_size = Vector2(42, 36)
+		icon.custom_minimum_size = Vector2(64, 64)
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		if count > 0:
-			icon.texture = load(fish.texture_path)
-			if fish.get("holographic", false):
-				icon.material = _holographic_material()
+		icon.texture = load(fish.texture_path)
+		if fish.get("holographic", false):
+			icon.material = _holographic_material()
 		row.add_child(icon)
+		var details := VBoxContainer.new()
+		details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		details.add_theme_constant_override("separation", 4)
+		row.add_child(details)
+		var name_label := _wrapped_label(fish.name, details)
+		name_label.add_theme_font_size_override("font_size", 21)
 		var favourite := _preferred_spot(progress, fish_index % progress.FISH.size())
-		var entry := "???   •   Undiscovered\nTry %s — this fish is more likely there." % favourite
 		if count > 0:
-			var record := "%.2f kg" % float(progress.best_weights[fish.id]) if progress.best_weights.has(fish.id) else "unknown — no saved weight for earlier catches"
-			entry = "%s   •   caught %d   •   %d coins/kg\nPersonal best: %s\nFavourite spot: %s" % [fish.name, count, fish.price, record, favourite]
-		if fish.get("holographic", false) and count == 0:
-			entry = "Holographic ???   •   Undiscovered\nA very rare shimmer — try %s." % favourite
-		_wrapped_label(entry, row)
-	_wrapped_label("Every species can bite at every bank. Holographic variants appear in 1 in 200 bites, swim faster and take more hits. They are bonus discoveries. Favourite spots give better odds.\nDiscoveries and recorded personal bests stay after selling.", modal_body)
+			var record := "%.2f kg" % float(progress.best_weights[fish.id]) if progress.best_weights.has(fish.id) else "not recorded"
+			_wrapped_label("Caught: %d   •   Personal best: %s" % [count, record], details)
+		else:
+			_wrapped_label("Not caught yet", details)
+		_wrapped_label("Best spot: %s   •   %d coins/kg" % [favourite, fish.price], details)
 	_button("Back [Esc]", modal_actions, func(): close_requested.emit()).grab_focus()
+
+func _journal_heading(title: String, description: String) -> void:
+	var heading := _wrapped_label(title, modal_body)
+	heading.add_theme_font_size_override("font_size", 22)
+	_wrapped_label(description, modal_body)
 
 func _preferred_spot(progress, fish_index: int) -> String:
 	var favourite := ""
