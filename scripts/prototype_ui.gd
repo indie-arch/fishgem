@@ -154,11 +154,13 @@ func show_waiting() -> void:
 	hint.text = "Line cast! Watch the bobber…  [Esc] reel in"
 	notice.text = "Waiting for a bite. Some fish take their time."
 
-func show_result(title: String, details: String, texture_path: String, can_recast: bool = false) -> void:
+func show_result(title: String, details: String, texture_path: String, can_recast: bool = false, holographic: bool = false) -> void:
 	set_modal(title)
 	if not texture_path.is_empty():
 		var icon := TextureRect.new()
 		icon.texture = load(texture_path)
+		if holographic:
+			icon.material = _holographic_material()
 		icon.custom_minimum_size = Vector2(100, 110)
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -256,11 +258,11 @@ func _request_upgrade(kind: String) -> void:
 	upgrade_requested.emit(kind)
 
 func show_journal(progress) -> void:
-	set_modal("Fish journal   •   %d / %d discovered" % [progress.discovered.size(), progress.FISH.size()])
+	set_modal("Fish journal   •   %d / %d discovered" % [progress.discovered_species_count(), progress.FISH.size()])
 	if progress.journal_complete():
 		var celebration := _wrapped_label("JOURNAL COMPLETE! Every fish found. Nice fishing!", modal_body)
 		celebration.add_theme_color_override("font_color", Color("397046"))
-	var catalog: Array = progress.fish_catalog()
+	var catalog: Array = progress.fish_catalog(true)
 	for fish_index in catalog.size():
 		var fish: Dictionary = catalog[fish_index]
 		var row := HBoxContainer.new()
@@ -273,14 +275,18 @@ func show_journal(progress) -> void:
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		if count > 0:
 			icon.texture = load(fish.texture_path)
+			if fish.get("holographic", false):
+				icon.material = _holographic_material()
 		row.add_child(icon)
-		var favourite := _preferred_spot(progress, fish_index)
+		var favourite := _preferred_spot(progress, fish_index % progress.FISH.size())
 		var entry := "???   •   Undiscovered\nTry %s — this fish is more likely there." % favourite
 		if count > 0:
 			var record := "%.2f kg" % float(progress.best_weights[fish.id]) if progress.best_weights.has(fish.id) else "unknown — no saved weight for earlier catches"
 			entry = "%s   •   caught %d   •   %d coins/kg\nPersonal best: %s\nFavourite spot: %s" % [fish.name, count, fish.price, record, favourite]
+		if fish.get("holographic", false) and count == 0:
+			entry = "Holographic ???   •   Undiscovered\nA very rare shimmer — try %s." % favourite
 		_wrapped_label(entry, row)
-	_wrapped_label("Every species can bite at every bank. Favourite spots give better odds.\nDiscoveries and recorded personal bests stay after selling.", modal_body)
+	_wrapped_label("Every species can bite at every bank. Holographic variants appear in 1 in 200 bites, swim faster and take more hits. They are bonus discoveries. Favourite spots give better odds.\nDiscoveries and recorded personal bests stay after selling.", modal_body)
 	_button("Back [Esc]", modal_actions, func(): close_requested.emit()).grab_focus()
 
 func _preferred_spot(progress, fish_index: int) -> String:
@@ -329,3 +335,8 @@ func _button(value: String, parent: Node, action: Callable) -> Button:
 	button.pressed.connect(action)
 	parent.add_child(button)
 	return button
+
+func _holographic_material() -> ShaderMaterial:
+	var shimmer := ShaderMaterial.new()
+	shimmer.shader = preload("res://scripts/holographic.gdshader")
+	return shimmer

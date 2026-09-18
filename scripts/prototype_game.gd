@@ -164,7 +164,7 @@ func _on_caught(fish: Dictionary) -> void:
 	var title := "You caught a %s!" % fish.name
 	var details := "It weighs %.2f kg!\nWorth %d coins at the shop." % [fish.weight_kg, progress.sale_value(fish)]
 	if is_discovery:
-		details += "\n\nNew species! Added to your fish journal."
+		details += "\n\nNew holographic variant! Added to your fish journal." if fish.get("holographic", false) else "\n\nNew species! Added to your fish journal."
 	elif float(fish.weight_kg) > previous_best:
 		details += "\n\nNew personal best!"
 		if previous_best > 0.0:
@@ -172,19 +172,19 @@ func _on_caught(fish: Dictionary) -> void:
 	if not was_complete and progress.journal_complete():
 		details = title + "\n" + details + "\n\nAll %d fish discovered. Nice fishing!" % progress.FISH.size()
 		title = "Journal complete!"
-	_show_result(title, details, fish.texture_path)
+	_show_result(title, details, fish.texture_path, fish.get("holographic", false))
 	_save_progress()
 
 func _on_escaped() -> void:
 	var fish: Dictionary = fishing.current_fish
 	_show_result("The %s swam away." % fish.get("name", "fish"),
-		"It slipped off the line. Cast again when you're ready.", str(fish.get("texture_path", "")))
+		"It slipped off the line. Cast again when you're ready.", str(fish.get("texture_path", "")), fish.get("holographic", false))
 
-func _show_result(title: String, details: String, texture_path: String) -> void:
+func _show_result(title: String, details: String, texture_path: String, holographic: bool = false) -> void:
 	bite_timer.stop()
 	world.end_cast()
 	_set_mode("result")
-	ui.show_result(title, details, texture_path, world.is_near_water() and not world.is_near_shop())
+	ui.show_result(title, details, texture_path, world.is_near_water() and not world.is_near_shop(), holographic)
 	ui.notice.text = title
 	_update_stats()
 
@@ -272,7 +272,7 @@ func _on_hint(message: String) -> void:
 
 func _update_stats() -> void:
 	ui.update_stats(progress.coins, progress.bag.size())
-	ui.update_collection(progress.discovered.size(), progress.FISH.size())
+	ui.update_collection(progress.discovered_species_count(), progress.FISH.size())
 
 func _save_progress() -> bool:
 	if _save_load_failed:

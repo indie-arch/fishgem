@@ -2,6 +2,7 @@ extends RefCounted
 ## Small, provisional economy. Species names, prices and rod tuning are placeholders.
 
 const SAVE_PATH := "user://fishgem_prototype.json"
+const HOLOGRAPHIC_CHANCE := 1.0 / 200.0
 const MAX_UPGRADE_LEVEL := 5
 const UPGRADE_COSTS := [30, 65, 110, 170, 250]
 const TEXTURE_FOLDER := "res://assets/kenney_fish-pack_2/PNG/Default/"
@@ -44,11 +45,32 @@ static func _index_species() -> Dictionary:
 	var definitions := {}
 	for fish in FISH:
 		definitions[fish.id] = fish
+		var holographic: Dictionary = fish.duplicate(true)
+		holographic.id = fish.id + "_holographic"
+		holographic.base_id = fish.id
+		holographic.holographic = true
+		holographic.name = "Holographic " + fish.name
+		holographic.speed = fish.speed * 1.3
+		holographic.danger_speed = fish.danger_speed * 1.3
+		holographic.required_hits = fish.required_hits + 3
+		definitions[holographic.id] = holographic
 	return definitions
 
 
-func fish_catalog() -> Array[Dictionary]:
-	return FISH.duplicate(true)
+func fish_catalog(include_holographic: bool = false) -> Array[Dictionary]:
+	var catalog: Array[Dictionary] = FISH.duplicate(true)
+	if include_holographic:
+		for fish in FISH:
+			catalog.append(fish_by_id(fish.id + "_holographic"))
+	return catalog
+
+
+func discovered_species_count() -> int:
+	var count := 0
+	for fish in FISH:
+		if int(discovered.get(fish.id, 0)) > 0:
+			count += 1
+	return count
 
 
 func fish_by_id(species_id: String) -> Dictionary:
@@ -70,7 +92,10 @@ func roll_fish(spot_id: String = "home_bank") -> Dictionary:
 	while ticket >= int(weights[fish_index]):
 		ticket -= int(weights[fish_index])
 		fish_index += 1
-	var fish: Dictionary = FISH[fish_index].duplicate(true)
+	var species_id: String = FISH[fish_index].id
+	if randf() < HOLOGRAPHIC_CHANCE:
+		species_id += "_holographic"
+	var fish := fish_by_id(species_id)
 	# Averaging two rolls makes ordinary sizes more likely than the extremes.
 	var size_factor := (randf_range(0.6, 1.4) + randf_range(0.6, 1.4)) * 0.5
 	fish.weight_kg = snappedf(fish.base_weight * size_factor * upgrade_effect("weight", int(upgrades.weight)), 0.01)
@@ -88,6 +113,11 @@ func add_catch(fish: Dictionary) -> void:
 	bag.append({"id": species_id, "weight_kg": float(fish.weight_kg)})
 	discovered[species_id] = int(discovered.get(species_id, 0)) + 1
 	best_weights[species_id] = maxf(float(best_weights.get(species_id, 0.0)), float(fish.weight_kg))
+	# A variant also discovers its species; the original collection goal stays attainable.
+	var base_id: String = _species_by_id[species_id].get("base_id", "")
+	if not base_id.is_empty():
+		discovered[base_id] = int(discovered.get(base_id, 0)) + 1
+		best_weights[base_id] = maxf(float(best_weights.get(base_id, 0.0)), float(fish.weight_kg))
 
 
 func sale_value(fish: Dictionary) -> int:
