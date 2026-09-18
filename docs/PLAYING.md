@@ -31,3 +31,9 @@ Save location:
 Kenney artwork is CC0. Godot is MIT licensed. Notices are in `licenses/`; Godot third-party notices: https://godotengine.org/license/.
 
 Report issues at https://github.com/indie-arch/fishgem/issues with your OS, GPU, and reproduction steps.
+
+### Holographic fish
+
+Every species has a holographic variant with an animated rainbow shimmer. Each bite has a 1 in 200 chance to be holographic at any bank, after the species is chosen. These fish swim 30% faster, advance danger 30% faster, and require three extra hits. Their usual movement style and rod upgrade benefits still apply.
+
+Holographic catches are named in the bag and tracked separately in the journal, including lifetime counts and personal best weights. They also discover their base species, so completing the ordinary journal does not require finding all holographic variants. Their sale prices follow the usual species and weight calculation.

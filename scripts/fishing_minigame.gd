@@ -43,6 +43,7 @@ var _feedback := "Click the swimming fish!"
 var _fish_color := Color("efbd62")
 var _texture: Texture2D
 var _background: Node2D
+var _fish_canvas: Node2D
 
 
 func _ready() -> void:
@@ -52,6 +53,10 @@ func _ready() -> void:
 	_background.show_behind_parent = true
 	add_child(_background)
 	_background.draw.connect(_draw_background)
+	_fish_canvas = Node2D.new()
+	_fish_canvas.show_behind_parent = true
+	add_child(_fish_canvas)
+	_fish_canvas.draw.connect(_draw_fish)
 	resized.connect(_redraw_all)
 	if not active:
 		hide()
@@ -61,6 +66,11 @@ func _ready() -> void:
 
 func start_fishing(fish: Dictionary, rod_level: int = 0, show_intro: bool = false) -> void:
 	current_fish = fish.duplicate(true)
+	_fish_canvas.material = null
+	if fish.get("holographic", false):
+		var shimmer := ShaderMaterial.new()
+		shimmer.shader = preload("res://scripts/holographic.gdshader")
+		_fish_canvas.material = shimmer
 	# Keep upgrades modest: they help aim without changing species identity.
 	target_radius = clampf(float(fish.get("radius", 32.0)) + Progress.upgrade_effect("ease", rod_level), 14.0, 64.0)
 	swim_speed = clampf(float(fish.get("speed", 125.0)), 20.0, 600.0)
@@ -274,7 +284,7 @@ func _draw() -> void:
 	else:
 		draw_arc(target_position, target_radius, 0.0, TAU, 48, PAPER, 3.0, true)
 	_draw_click_feedback()
-	_draw_fish()
+	_fish_canvas.queue_redraw()
 	_text(Vector2(38, 430), "Take your time — fishing is paused." if introducing else _feedback, 19, INK)
 	_draw_catch_bar()
 	var danger_label := "RED IS CLOSE!" if catch_progress - danger_progress <= 0.06 else "RED = ESCAPE"
@@ -301,7 +311,7 @@ func _draw_background() -> void:
 	_background.draw_rect(Rect2(Vector2(5, 7), DESIGN_SIZE), Color("142e2c"))
 	_background.draw_rect(Rect2(Vector2.ZERO, DESIGN_SIZE), PAPER)
 	_background.draw_rect(Rect2(Vector2.ZERO, DESIGN_SIZE), INK, false, 5.0)
-	_text(Vector2(32, 43), "FISH ON!", 28, INK, _background)
+	_text(Vector2(32, 43), "HOLOGRAPHIC FISH ON!" if current_fish.get("holographic", false) else "FISH ON!", 28, INK, _background)
 	_text(Vector2(32, 78), "Click inside the ring. Keep the gold marker ahead of red!", 19, INK, _background)
 	_text(Vector2(626, 43), "ESC  leave", 16, INK, _background)
 	_background.draw_rect(POND, Color("70b8bb"))
@@ -371,26 +381,29 @@ func _draw_catch_bar() -> void:
 
 
 func _draw_fish() -> void:
+	if not active:
+		return
+	_fish_canvas.draw_set_transform(_design_origin(), 0.0, Vector2.ONE * _design_scale())
 	var direction := 1.0 if _direction.x >= 0.0 else -1.0
 	var fish_scale := target_radius * (1.0 + _flash * 0.12)
 	if _texture != null:
 		var dimensions := _texture.get_size()
 		var draw_size := dimensions * (fish_scale * 1.75 / maxf(dimensions.x, dimensions.y))
 		# Supplied Kenney fish face left in their original textures.
-		draw_set_transform(_design_origin() + target_position * _design_scale(), 0.0, Vector2(-direction, 1.0) * _design_scale())
-		draw_texture_rect(_texture, Rect2(-draw_size * 0.5, draw_size), false)
-		draw_set_transform(_design_origin(), 0.0, Vector2.ONE * _design_scale())
+		_fish_canvas.draw_set_transform(_design_origin() + target_position * _design_scale(), 0.0, Vector2(-direction, 1.0) * _design_scale())
+		_fish_canvas.draw_texture_rect(_texture, Rect2(-draw_size * 0.5, draw_size), false)
+		_fish_canvas.draw_set_transform(_design_origin(), 0.0, Vector2.ONE * _design_scale())
 		return
 	var tail := PackedVector2Array([
 		target_position + Vector2(-0.4 * direction, 0) * fish_scale,
 		target_position + Vector2(-0.85 * direction, -0.5) * fish_scale,
 		target_position + Vector2(-0.85 * direction, 0.5) * fish_scale,
 	])
-	draw_colored_polygon(tail, _fish_color.darkened(0.15))
-	draw_circle(target_position, fish_scale * 0.63, _fish_color)
+	_fish_canvas.draw_colored_polygon(tail, _fish_color.darkened(0.15))
+	_fish_canvas.draw_circle(target_position, fish_scale * 0.63, _fish_color)
 	var eye := target_position + Vector2(0.25 * direction, -0.17) * fish_scale
-	draw_circle(eye, 5.0, PAPER)
-	draw_circle(eye + Vector2(direction, 0), 2.5, INK)
+	_fish_canvas.draw_circle(eye, 5.0, PAPER)
+	_fish_canvas.draw_circle(eye + Vector2(direction, 0), 2.5, INK)
 
 
 func _text(position_at: Vector2, value: String, font_size: int, color: Color, canvas: CanvasItem = self) -> void:
