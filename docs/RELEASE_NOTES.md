@@ -1,13 +1,14 @@
-FishGem v0.1.1 adds rare holographic fish to the shoreline prototype.
+FishGem v0.1.1.1 makes the fish journal easier to read and browse.
 
 ## What’s new
 
-- Every species now has a holographic variant with an animated rainbow shimmer and a 1 in 200 chance per bite.
-- Holographic encounters swim 30% faster, advance danger 30% faster, and require three extra hits.
-- The bag identifies holographic catches, and the journal tracks their lifetime counts and personal best weights separately. They also count toward discovering the base species.
-- Desktop packaging includes a Linux AppImage, Windows installer, and universal macOS DMG, alongside portable archives.
+- Every fish now has an image and a readable name, including fish you have not caught yet.
+- Clear catch status, personal bests, preferred fishing spots, and sale prices replace the repeated question-mark entries.
+- Normal species and bonus holographic fish have separate sections and discovery counts.
+- Spaced entry cards make the scrolling list easier to follow.
+- Added regression coverage for journal images, labels, row layout, mouse-wheel scrolling, and reopening.
 
-Existing progress is preserved. Holographic fish use the normal species and weight sale prices.
+Existing progress is preserved. Fishing balance and save data are unchanged.
 
 ## Downloads
 
